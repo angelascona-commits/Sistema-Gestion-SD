@@ -6,6 +6,7 @@ export default function Reportes() {
     const [reportes, setReportes] = useState([]);
     const [cargando, setCargando] = useState(true);
     const [usuarioActual, setUsuarioActual] = useState(null);
+    const [feriados, setFeriados] = useState([]);
 
     const [resumen, setResumen] = useState({
         totalSemana: 0,
@@ -15,6 +16,48 @@ export default function Reportes() {
         tiempoInsuficiente: 0,
         promedioCierre: 0
     });
+
+    // 1. FUNCIÓN EXACTA DE CÁLCULO (Evita las 5 horas de zona horaria)
+    const calcularHorasLaborables = (fechaInicioStr, fechaFinStr, listaFeriados = []) => {
+        if (!fechaInicioStr || !fechaFinStr) return 0;
+
+        const limpiarFecha = (fecha) => {
+            const str = String(fecha).replace(' ', 'T');
+            return str.substring(0, 16); 
+        };
+
+        const inicio = new Date(limpiarFecha(fechaInicioStr));
+        const fin = new Date(limpiarFecha(fechaFinStr));
+
+        if (isNaN(inicio.getTime()) || isNaN(fin.getTime()) || inicio >= fin) return 0;
+
+        const feriadosSet = new Set(listaFeriados.map(f => {
+            if(!f.fecha) return f; // Por si viene como string plano
+            const [year, month, day] = f.fecha.split('T')[0].split('-');
+            return `${year}-${month}-${day}`;
+        }));
+
+        let minutosLaborables = 0;
+        let actual = new Date(inicio.getTime());
+
+        while (actual < fin) {
+            const dia = actual.getDay();
+            const hora = actual.getHours();
+            
+            const yyyy = actual.getFullYear();
+            const mm = String(actual.getMonth() + 1).padStart(2, '0');
+            const dd = String(actual.getDate()).padStart(2, '0');
+            const fechaLocalStr = `${yyyy}-${mm}-${dd}`;
+            
+            if (dia >= 1 && dia <= 5 && hora >= 9 && hora < 18 && !feriadosSet.has(fechaLocalStr)) {
+                minutosLaborables++;
+            }
+            
+            actual.setMinutes(actual.getMinutes() + 1);
+        }
+        
+        return minutosLaborables / 60;
+    };
 
     useEffect(() => {
         const cargarDatos = async () => {
@@ -29,6 +72,12 @@ export default function Reportes() {
                     return;
                 }
 
+                // Cargamos los feriados para el cálculo
+                const { data: dataFeriados } = await supabase.from('feriados').select('fecha');
+                const feriadosList = dataFeriados ? dataFeriados.map(f => f.fecha) : [];
+                setFeriados(feriadosList);
+
+                // Cargamos los reportes
                 let query = supabase
                     .from('vista_reportes_kpi')
                     .select('*')
@@ -41,8 +90,31 @@ export default function Reportes() {
                 const { data, error } = await query;
                 if (error) throw error;
 
-                setReportes(data || []);
-                calcularResumenSemanal(data || []);
+                // 2. RECALCULAMOS LOS KPI EN TIEMPO REAL PARA LA TABLA
+                const datosCorregidos = (data || []).map(ticket => {
+                    // KPI Asignación: Creación SD vs Asignación (> 8h)
+                    let kpiAsig = ticket.asignacion_fuera_tiempo;
+                    if (ticket.fecha_creacion_sd && ticket.fecha_asignacion) {
+                        const horasAsig = calcularHorasLaborables(ticket.fecha_creacion_sd, ticket.fecha_asignacion, feriadosList);
+                        kpiAsig = horasAsig > 8;
+                    }
+
+                    // KPI Tiempo Insuficiente: Asignación vs Máxima Atención (< 16h)
+                    let kpiInsuficiente = ticket.tiempo_insuficiente;
+                    if (ticket.fecha_asignacion && ticket.fecha_maxima_atencion) {
+                        const horasMax = calcularHorasLaborables(ticket.fecha_asignacion, ticket.fecha_maxima_atencion, feriadosList);
+                        kpiInsuficiente = horasMax < 16;
+                    }
+
+                    return {
+                        ...ticket,
+                        asignacion_fuera_tiempo: kpiAsig,
+                        tiempo_insuficiente: kpiInsuficiente
+                    };
+                });
+
+                setReportes(datosCorregidos);
+                calcularResumenSemanal(datosCorregidos);
 
             } catch (error) {
                 console.error("Error cargando reportes:", error.message);
@@ -234,7 +306,7 @@ export default function Reportes() {
 
                                         <td className="t-date">{formatearFecha(rep.fecha_creacion_sd)}</td>
 
-                                        {/* KPIs */}
+                                        {/* KPIs Dinámicos */}
                                         <td className="text-center">
                                             {rep.asignacion_fuera_tiempo === null ? <span style={{ color: '#94a3b8' }}>-</span> :
                                                 rep.asignacion_fuera_tiempo ? <span className="kpi-badge badge-red">F. Tiempo</span> : <span className="kpi-badge badge-green">OK</span>}

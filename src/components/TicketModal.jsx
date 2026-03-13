@@ -26,12 +26,24 @@ export default function TicketModal({ isOpen, onClose, numeroTicket }) {
 
   const calcularHorasLaborables = (fechaInicioStr, fechaFinStr, listaFeriados = []) => {
     if (!fechaInicioStr || !fechaFinStr) return 0;
-    let inicio = new Date(fechaInicioStr);
-    let fin = new Date(fechaFinStr);
-    if (inicio >= fin) return 0;
 
-    let horas = 0;
-    let actual = new Date(inicio);
+    const limpiarFecha = (fecha) => {
+      const str = String(fecha).replace(' ', 'T');
+      return str.substring(0, 16); 
+    };
+
+    const inicio = new Date(limpiarFecha(fechaInicioStr));
+    const fin = new Date(limpiarFecha(fechaFinStr));
+
+    if (isNaN(inicio.getTime()) || isNaN(fin.getTime()) || inicio >= fin) return 0;
+
+    const feriadosSet = new Set(listaFeriados.map(f => {
+      const [year, month, day] = f.split('T')[0].split('-');
+      return `${year}-${month}-${day}`;
+    }));
+
+    let minutosLaborables = 0;
+    let actual = new Date(inicio.getTime());
 
     while (actual < fin) {
       const dia = actual.getDay();
@@ -42,14 +54,14 @@ export default function TicketModal({ isOpen, onClose, numeroTicket }) {
       const dd = String(actual.getDate()).padStart(2, '0');
       const fechaLocalStr = `${yyyy}-${mm}-${dd}`;
       
-      const esFeriado = listaFeriados.includes(fechaLocalStr);
-
-      if (dia >= 1 && dia <= 5 && hora >= 9 && hora < 18 && !esFeriado) {
-        horas++;
+      if (dia >= 1 && dia <= 5 && hora >= 9 && hora < 18 && !feriadosSet.has(fechaLocalStr)) {
+        minutosLaborables++;
       }
-      actual.setHours(actual.getHours() + 1);
+      
+      actual.setMinutes(actual.getMinutes() + 1);
     }
-    return horas;
+    
+    return minutosLaborables / 60;
   };
 
   const calcularDiferenciaRealHoras = (fechaLimite, fechaCierre) => {
@@ -73,14 +85,14 @@ export default function TicketModal({ isOpen, onClose, numeroTicket }) {
     estado_jira_id: '',
     horas_invertidas: 0,
     observaciones: '',
-    horario_laboral: '', 
-    fecha_registro: getFechaLocalActual(), 
-    fecha_creacion_sd: '',                 
-    fecha_asignacion: '', 
-    fecha_delegacion: '', 
+    horario_laboral: '',
+    fecha_registro: getFechaLocalActual(),
+    fecha_creacion_sd: '',
+    fecha_asignacion: '',
+    fecha_delegacion: '',
     fecha_estimada: '',
-    fecha_maxima_atencion: '',             
-    fecha_atencion: ''                     
+    fecha_maxima_atencion: '',
+    fecha_atencion: ''
   });
 
   useEffect(() => {
@@ -120,7 +132,7 @@ export default function TicketModal({ isOpen, onClose, numeroTicket }) {
         numero_ticket: '', descripcion: '', dni: '', poliza: '', prioridad_id: '', producto_id: '',
         responsable_id: '', estado_id: '', aplicacion_id: '', estado_jira_id: '',
         horas_invertidas: 0, observaciones: '', horario_laboral: '',
-        fecha_registro: getFechaLocalActual(), 
+        fecha_registro: getFechaLocalActual(),
         fecha_creacion_sd: '', fecha_asignacion: '', fecha_delegacion: '', fecha_estimada: '',
         fecha_maxima_atencion: '', fecha_atencion: ''
       }));
@@ -195,9 +207,9 @@ export default function TicketModal({ isOpen, onClose, numeroTicket }) {
         newFormData.fecha_delegacion = getFechaLocalActual();
         const respSeleccionado = responsables.find(r => r.id.toString() === value);
         if (respSeleccionado && respSeleccionado.horario_laboral) {
-            newFormData.horario_laboral = respSeleccionado.horario_laboral;
+          newFormData.horario_laboral = respSeleccionado.horario_laboral;
         } else {
-            newFormData.horario_laboral = '09:00 - 18:00'; 
+          newFormData.horario_laboral = '09:00 - 18:00';
         }
       } else {
         newFormData.fecha_delegacion = '';
@@ -287,23 +299,28 @@ export default function TicketModal({ isOpen, onClose, numeroTicket }) {
         ticketProcesadoId = data[0].id;
       }
 
-      const horasAsignacion = calcularHorasLaborables(formData.fecha_creacion_sd, formData.fecha_asignacion, feriados);
-      const kpi_asignacion_fuera_tiempo = (formData.fecha_creacion_sd && formData.fecha_asignacion) ? horasAsignacion > 8 : false;
+      const inicioAsigKPI = formData.fecha_creacion_sd || formData.fecha_registro;
+      const finAsigKPI = formData.fecha_asignacion;
+      const horasAsignacion = calcularHorasLaborables(inicioAsigKPI, finAsigKPI, feriados);
+      const kpi_asignacion_fuera_tiempo = (inicioAsigKPI && finAsigKPI) ? horasAsignacion > 8 : false;
 
       const horasAtencionLimite = calcularHorasLaborables(formData.fecha_asignacion, formData.fecha_maxima_atencion, feriados);
       const kpi_tiempo_insuficiente = (formData.fecha_asignacion && formData.fecha_maxima_atencion) ? horasAtencionLimite < 16 : false;
 
-      const kpi_diferencia_cierre = calcularDiferenciaRealHoras(formData.fecha_maxima_atencion, formData.fecha_atencion);
+      let kpi_diferencia_cierre = null;
+      if (typeof calcularDiferenciaRealHoras === 'function') {
+        kpi_diferencia_cierre = calcularDiferenciaRealHoras(formData.fecha_maxima_atencion, formData.fecha_atencion);
+      }
 
       const payloadKpi = {
         ticket_id: ticketProcesadoId,
         asignacion_fuera_tiempo: kpi_asignacion_fuera_tiempo,
         tiempo_insuficiente: kpi_tiempo_insuficiente,
-        diferencia_cierre: kpi_diferencia_cierre ? parseFloat(kpi_diferencia_cierre) : null
+        diferencia_cierre: (kpi_diferencia_cierre !== null && kpi_diferencia_cierre !== undefined && !isNaN(kpi_diferencia_cierre)) ? parseFloat(kpi_diferencia_cierre) : null
       };
 
-      await supabase.from('ticket_kpis').upsert([payloadKpi], { onConflict: 'ticket_id' });
-
+      const { error: kpiError } = await supabase.from('ticket_kpis').upsert(payloadKpi, { onConflict: 'ticket_id' });
+      if (kpiError) throw kpiError;
 
       await supabase.from('historial_tickets').insert([{
         ticket_id: ticketProcesadoId,
@@ -323,19 +340,24 @@ export default function TicketModal({ isOpen, onClose, numeroTicket }) {
         showConfirmButton: false
       }).then(() => {
         onClose();
-        window.location.reload(); 
+        window.location.reload();
       });
 
     } catch (error) {
       console.error('Error:', error);
-      Swal.fire({ icon: 'error', title: 'Error del servidor', text: 'Hubo un error inesperado al guardar los cambios.', confirmButtonColor: '#ea580c' });
+      Swal.fire({ 
+        icon: 'error', 
+        title: 'Error al guardar', 
+        text: error.message || 'Hubo un error inesperado en la base de datos.', 
+        confirmButtonColor: '#ea580c' 
+      });
     }
   }
 
   if (!isOpen) return null;
 
   const formatearParaInput = (fecha) => {
-    if (!fecha) return ""; 
+    if (!fecha) return "";
     try {
       const fechaStr = String(fecha).replace(' ', 'T');
       return fechaStr.substring(0, 16);
@@ -344,7 +366,7 @@ export default function TicketModal({ isOpen, onClose, numeroTicket }) {
     }
   };
 
-  
+
   const uiHorasAsignacion = calcularHorasLaborables(formData.fecha_creacion_sd, formData.fecha_asignacion, feriados);
   const excedeAsignacion = (formData.fecha_creacion_sd && formData.fecha_asignacion) && (uiHorasAsignacion > 8);
 
@@ -403,7 +425,7 @@ export default function TicketModal({ isOpen, onClose, numeroTicket }) {
                   <label>Descripción del Problema</label>
                   <textarea className="form-control" rows="2" name="descripcion" value={formData.descripcion} onChange={handleChange} />
                 </div>
-                
+
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                   <div className="form-group">
                     <label>Tipo de SD {!isEditing && <span style={{ color: 'red' }}>*</span>}</label>
@@ -481,14 +503,14 @@ export default function TicketModal({ isOpen, onClose, numeroTicket }) {
                 </div>
 
                 <div style={{ padding: '16px', backgroundColor: 'var(--slate-50)', borderRadius: '8px', marginBottom: '20px', border: '1px solid var(--slate-200)' }}>
-                  
+
                   <h4 style={{ fontSize: '0.875rem', fontWeight: 'bold', marginBottom: '16px', color: 'var(--slate-700)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     <span className="material-symbols-outlined" style={{ fontSize: '16px', verticalAlign: 'text-bottom', marginRight: '6px' }}>calendar_month</span>
                     Gestión de Fechas
                   </h4>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                    
+
                     <div className="form-group" style={{ marginBottom: 0 }}>
                       <label style={{ color: '#0369a1' }}>Fecha de registro SD </label>
                       <input type="datetime-local" className="form-control" name="fecha_creacion_sd" value={formatearParaInput(formData.fecha_creacion_sd)} onChange={handleChange} />
@@ -498,9 +520,9 @@ export default function TicketModal({ isOpen, onClose, numeroTicket }) {
                       <label>Fecha Asignación</label>
                       <input type="datetime-local" className="form-control" name="fecha_asignacion" value={formatearParaInput(formData.fecha_asignacion)} onChange={handleChange} />
                       {formData.fecha_creacion_sd && formData.fecha_asignacion && (
-                          <small style={{ color: excedeAsignacion ? '#dc2626' : '#16a34a', fontWeight: '600', fontSize: '11px', marginTop: '4px', display: 'block' }}>
-                             {excedeAsignacion ? '⚠️ Fuera de tiempo: Supera las 8h laborables desde Creación SD' : '✅ Asignación dentro del tiempo límite'}
-                          </small>
+                        <small style={{ color: excedeAsignacion ? '#dc2626' : '#16a34a', fontWeight: '600', fontSize: '11px', marginTop: '4px', display: 'block' }}>
+                          {excedeAsignacion ? '⚠️ Fuera de tiempo: Supera las 8h laborables desde Creación SD' : '✅ Asignación dentro del tiempo límite'}
+                        </small>
                       )}
                     </div>
 
@@ -508,9 +530,9 @@ export default function TicketModal({ isOpen, onClose, numeroTicket }) {
                       <label>Fecha Máxima Atención </label>
                       <input type="datetime-local" className="form-control" name="fecha_maxima_atencion" value={formatearParaInput(formData.fecha_maxima_atencion)} onChange={handleChange} />
                       {formData.fecha_asignacion && formData.fecha_maxima_atencion && (
-                          <small style={{ color: tiempoInsuficiente ? '#dc2626' : '#16a34a', fontWeight: '600', fontSize: '11px', marginTop: '4px', display: 'block' }}>
-                             {tiempoInsuficiente ? '⚠️ Tiempo insuficiente: Es menor a 16h laborables desde la asignación' : '✅ Tiempo de SLA correcto'}
-                          </small>
+                        <small style={{ color: tiempoInsuficiente ? '#dc2626' : '#16a34a', fontWeight: '600', fontSize: '11px', marginTop: '4px', display: 'block' }}>
+                          {tiempoInsuficiente ? '⚠️ Tiempo insuficiente: Es menor a 16h laborables desde la asignación' : '✅ Tiempo de SLA correcto'}
+                        </small>
                       )}
                     </div>
 
@@ -525,7 +547,7 @@ export default function TicketModal({ isOpen, onClose, numeroTicket }) {
                         <input type="datetime-local" className="form-control" name="fecha_atencion" value={formatearParaInput(formData.fecha_atencion)} onChange={handleChange} />
                         {formData.fecha_maxima_atencion && formData.fecha_atencion && (
                           <small style={{ color: superaCierre ? '#dc2626' : '#16a34a', fontWeight: '600', fontSize: '11px', marginTop: '4px', display: 'block' }}>
-                             {difCierreMensaje}
+                            {difCierreMensaje}
                           </small>
                         )}
                       </div>
@@ -536,8 +558,8 @@ export default function TicketModal({ isOpen, onClose, numeroTicket }) {
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                   <div className="form-group" style={{ marginBottom: 0 }}>
-                      <label>Fecha Estimada</label>
-                      <input type="datetime-local" className="form-control" name="fecha_estimada" value={formatearParaInput(formData.fecha_estimada)} onChange={handleChange} />
+                    <label>Fecha Estimada</label>
+                    <input type="datetime-local" className="form-control" name="fecha_estimada" value={formatearParaInput(formData.fecha_estimada)} onChange={handleChange} />
                   </div>
                   {isEditing && (
                     <div className="form-group" style={{ marginBottom: 0 }}>
@@ -547,7 +569,7 @@ export default function TicketModal({ isOpen, onClose, numeroTicket }) {
                   )}
                 </div>
 
-                <div className="form-group" style={{marginTop: '16px'}}>
+                <div className="form-group" style={{ marginTop: '16px' }}>
                   <label>Observaciones</label>
                   <textarea className="form-control" rows="2" name="observaciones" value={formData.observaciones} onChange={handleChange} />
                 </div>
