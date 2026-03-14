@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard';
 import Tickets from './pages/Tickets';
 import Login from './pages/Login'; 
 import Reportes from './pages/Reportes';
+import Usuarios from './pages/Usuarios';
 
 function App() {
   const [usuario, setUsuario] = useState(null);
@@ -38,6 +39,7 @@ function App() {
           <Route path="/Dashboard" element={<Dashboard />} />
           <Route path="/Tickets" element={<Tickets />} />
           <Route path="/Reportes" element={<Reportes />} />
+          <Route path="/Usuarios" element={<Usuarios />} />
           <Route path="*" element={<Navigate to="/Dashboard" replace />} />
         </Routes>
       </Layout>

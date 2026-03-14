@@ -1,0 +1,89 @@
+/* Información del Usuario con un pequeño avatar circular */
+.user-info-cell {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.user-avatar {
+    width: 32px;
+    height: 32px;
+    background-color: #f97316; /* Naranja base */
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 0.9rem;
+}
+
+/* Fila inactiva para distinguir visualmente a los usuarios desactivados */
+.row-inactive td {
+    opacity: 0.6;
+    background-color: #f8fafc;
+}
+
+/* Estilos de los roles */
+.role-badge {
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.role-admin {
+    background-color: #e0e7ff;
+    color: #4f46e5;
+    border: 1px solid #c7d2fe;
+}
+
+.role-agent {
+    background-color: #f1f5f9;
+    color: #475569;
+    border: 1px solid #e2e8f0;
+}
+
+/* Botones de acción en la tabla */
+.action-buttons {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+}
+
+.btn-icon {
+    background: none;
+    border: none;
+    cursor: pointer;
+    border-radius: 6px;
+    padding: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.btn-icon .material-symbols-outlined {
+    font-size: 20px;
+}
+
+.btn-edit {
+    color: #3b82f6; /* Azul */
+}
+.btn-edit:hover {
+    background-color: #eff6ff;
+}
+
+.btn-delete {
+    color: #ef4444; /* Rojo */
+}
+.btn-delete:hover {
+    background-color: #fef2f2;
+}
+
+.btn-restore {
+    color: #10b981; /* Verde */
+}
+.btn-restore:hover {
+    background-color: #ecfdf5;
+}

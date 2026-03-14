@@ -307,9 +307,20 @@ export default function TicketModal({ isOpen, onClose, numeroTicket }) {
       const horasAtencionLimite = calcularHorasLaborables(formData.fecha_asignacion, formData.fecha_maxima_atencion, feriados);
       const kpi_tiempo_insuficiente = (formData.fecha_asignacion && formData.fecha_maxima_atencion) ? horasAtencionLimite < 16 : false;
 
+      // MODIFICACIÓN APLICADA: Calculamos la diferencia guardando negativo si es a favor
       let kpi_diferencia_cierre = null;
-      if (typeof calcularDiferenciaRealHoras === 'function') {
-        kpi_diferencia_cierre = calcularDiferenciaRealHoras(formData.fecha_maxima_atencion, formData.fecha_atencion);
+      if (formData.fecha_maxima_atencion && formData.fecha_atencion) {
+        const limite = new Date(formData.fecha_maxima_atencion);
+        const cierre = new Date(formData.fecha_atencion);
+
+        if (cierre > limite) {
+          // Se cerró tarde (horas en contra, guardamos como positivo)
+          kpi_diferencia_cierre = calcularHorasLaborables(formData.fecha_maxima_atencion, formData.fecha_atencion, feriados);
+        } else {
+          // Se cerró temprano (horas a favor, guardamos como negativo)
+          const horasAFavor = calcularHorasLaborables(formData.fecha_atencion, formData.fecha_maxima_atencion, feriados);
+          kpi_diferencia_cierre = -Math.abs(horasAFavor);
+        }
       }
 
       const payloadKpi = {
@@ -373,17 +384,21 @@ export default function TicketModal({ isOpen, onClose, numeroTicket }) {
   const uiHorasMaxima = calcularHorasLaborables(formData.fecha_asignacion, formData.fecha_maxima_atencion, feriados);
   const tiempoInsuficiente = (formData.fecha_asignacion && formData.fecha_maxima_atencion) && (uiHorasMaxima < 16);
 
+  // MODIFICACIÓN APLICADA: Calculamos la diferencia de cierre para la interfaz
   let superaCierre = false;
   let difCierreMensaje = "";
   if (formData.fecha_atencion && formData.fecha_maxima_atencion) {
-    const lim = new Date(formData.fecha_maxima_atencion);
-    const aten = new Date(formData.fecha_atencion);
-    if (aten > lim) {
+    const limite = new Date(formData.fecha_maxima_atencion);
+    const cierre = new Date(formData.fecha_atencion);
+    
+    if (cierre > limite) {
       superaCierre = true;
-      const difHrs = ((aten - lim) / (1000 * 60 * 60)).toFixed(1);
-      difCierreMensaje = `Vencido: El cierre superó el límite por ${difHrs} horas.`;
+      const difHrs = calcularHorasLaborables(formData.fecha_maxima_atencion, formData.fecha_atencion, feriados);
+      difCierreMensaje = `Vencido: El cierre superó el límite por ${difHrs.toFixed(1)} horas.`;
     } else {
-      difCierreMensaje = `Ticket cerrado a tiempo dentro del límite.`;
+      superaCierre = false;
+      const difHrs = calcularHorasLaborables(formData.fecha_atencion, formData.fecha_maxima_atencion, feriados);
+      difCierreMensaje = `A tiempo: Resuelto con ${difHrs.toFixed(1)}h a favor.`;
     }
   }
 

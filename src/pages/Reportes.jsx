@@ -23,7 +23,7 @@ export default function Reportes() {
 
         const limpiarFecha = (fecha) => {
             const str = String(fecha).replace(' ', 'T');
-            return str.substring(0, 16); 
+            return str.substring(0, 16);
         };
 
         const inicio = new Date(limpiarFecha(fechaInicioStr));
@@ -32,7 +32,7 @@ export default function Reportes() {
         if (isNaN(inicio.getTime()) || isNaN(fin.getTime()) || inicio >= fin) return 0;
 
         const feriadosSet = new Set(listaFeriados.map(f => {
-            if(!f.fecha) return f; // Por si viene como string plano
+            if (!f.fecha) return f; // Por si viene como string plano
             const [year, month, day] = f.fecha.split('T')[0].split('-');
             return `${year}-${month}-${day}`;
         }));
@@ -43,19 +43,19 @@ export default function Reportes() {
         while (actual < fin) {
             const dia = actual.getDay();
             const hora = actual.getHours();
-            
+
             const yyyy = actual.getFullYear();
             const mm = String(actual.getMonth() + 1).padStart(2, '0');
             const dd = String(actual.getDate()).padStart(2, '0');
             const fechaLocalStr = `${yyyy}-${mm}-${dd}`;
-            
+
             if (dia >= 1 && dia <= 5 && hora >= 9 && hora < 18 && !feriadosSet.has(fechaLocalStr)) {
                 minutosLaborables++;
             }
-            
+
             actual.setMinutes(actual.getMinutes() + 1);
         }
-        
+
         return minutosLaborables / 60;
     };
 
@@ -130,7 +130,7 @@ export default function Reportes() {
         if (!datos.length) return;
 
         const hoy = new Date();
-        const diaSemana = hoy.getDay() === 0 ? 7 : hoy.getDay(); 
+        const diaSemana = hoy.getDay() === 0 ? 7 : hoy.getDay();
         const inicioSemana = new Date(hoy);
         inicioSemana.setDate(hoy.getDate() - diaSemana + 1);
         inicioSemana.setHours(0, 0, 0, 0);
@@ -254,7 +254,7 @@ export default function Reportes() {
                         <span className="material-symbols-outlined">moving</span>
                     </div>
                     <div className="kpi-info">
-                        <h3>{resumen.promedioCierre} h</h3>
+                        <h3>{Number(resumen.promedioCierre).toFixed(2)}h</h3>
                         <p>Promedio Desviación</p>
                     </div>
                 </div>
@@ -320,7 +320,7 @@ export default function Reportes() {
                                         <td className="text-center font-bold">
                                             {rep.diferencia_cierre !== null ? (
                                                 <span style={{ color: rep.diferencia_cierre > 0 ? '#dc2626' : '#16a34a' }}>
-                                                    {rep.diferencia_cierre > 0 ? '+' : ''}{rep.diferencia_cierre}h
+                                                    {rep.diferencia_cierre > 0 ? '+' : ''}{Number(rep.diferencia_cierre).toFixed(2)}h
                                                 </span>
                                             ) : <span style={{ color: '#94a3b8' }}>En proceso</span>}
                                         </td>
