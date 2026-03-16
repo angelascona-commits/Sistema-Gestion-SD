@@ -31,7 +31,6 @@ export default function Dashboard() {
             return `${year}-${month}-${day}`;
         }));
 
-        // Soporte para fechas invertidas (ej. cierre antes de fecha máxima = negativo)
         let esNegativo = false;
         if (inicio > fin) {
             const temp = inicio;
@@ -82,14 +81,25 @@ export default function Dashboard() {
             if (errorAlarmas) throw errorAlarmas;
             setAlarmas(dataAlarmas || []);
 
+            // Pedimos los datos ordenados, mandando los nulos al final para que no interfieran
             const { data: dataTickets, error: errorTickets } = await supabase
                 .from('vista_tickets_completos')
                 .select('*')
-                .order('fecha_registro', { ascending: false })
-                .limit(10);
+                .order('fecha_creacion_sd', { ascending: false, nullsFirst: false }) 
+                .limit(20); // Subí un poco el límite por si quieres ver más
 
             if (errorTickets) throw errorTickets;
-            setTicketsRecientes(dataTickets || []);
+
+            // REFUERZO: Forzamos el orden exacto usando JavaScript por fecha para evitar que se guíe por el ID
+            let ticketsOrdenados = dataTickets || [];
+            ticketsOrdenados.sort((a, b) => {
+                const fechaA = a.fecha_creacion_sd ? new Date(a.fecha_creacion_sd).getTime() : 0;
+                const fechaB = b.fecha_creacion_sd ? new Date(b.fecha_creacion_sd).getTime() : 0;
+                return fechaB - fechaA; // El mayor (más reciente) va primero
+            });
+
+            // Cortamos a los 10 más recientes ya ordenados correctamente
+            setTicketsRecientes(ticketsOrdenados.slice(0, 10));
 
         } catch (error) {
             console.error("Error cargando el dashboard:", error.message);
@@ -109,7 +119,7 @@ export default function Dashboard() {
     };
 
     const formatearFecha = (fechaIso) => {
-        if (!fechaIso) return 'N/A';
+        if (!fechaIso) return '-';
         const fecha = new Date(fechaIso);
         return fecha.toLocaleString('es-PE', {
             timeZone: 'UTC',
@@ -201,45 +211,42 @@ export default function Dashboard() {
                                     <th>Ticket ID</th>
                                     <th>Descripción</th>
                                     <th>App / Módulo</th>
+                                    {/* 2. Agregamos el encabezado de la nueva columna */}
+                                    <th>Creación SD</th>
                                     <th className="text-center">T. Asignación</th>
                                     <th className="text-center">T. Límite SLA</th>
                                     <th className="text-center">Resolución</th>
                                     <th className="text-center">Estado</th>
                                     <th>Designado</th>
-                                    <th>Creado</th>
+                                    <th>Registrado en App</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {ticketsRecientes.length === 0 ? (
-                                    <tr><td colSpan="9" className="text-center">No hay tickets registrados aún.</td></tr>
+                                    <tr><td colSpan="10" className="text-center">No hay tickets registrados aún.</td></tr>
                                 ) : (
                                     ticketsRecientes.map((ticket) => {
                                         
-                                        // 1. T. Asignación = Fecha Asignación - Fecha Creación SD
                                         let tAsignacion = '-';
                                         if (ticket.fecha_creacion_sd && ticket.fecha_asignacion) {
                                             const horasAsig = calcularHorasLaborables(ticket.fecha_creacion_sd, ticket.fecha_asignacion, feriados);
                                             tAsignacion = `${horasAsig.toFixed(1)}h`;
                                         }
 
-                                        // 2. T. Límite SLA = Fecha Máxima de Atención - Fecha Asignación
                                         let tLimite = '-';
                                         if (ticket.fecha_asignacion && ticket.fecha_maxima_atencion) {
                                             const horasLim = calcularHorasLaborables(ticket.fecha_asignacion, ticket.fecha_maxima_atencion, feriados);
                                             tLimite = `${horasLim.toFixed(1)}h`;
                                         }
 
-                                        // 3. Resolución = Fecha Atención (Cierre) - Fecha Máxima
                                         let resolucionJSX = <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>En proceso</span>;
                                         if (['Cerrado', 'Atendido', 'Resuelto'].includes(ticket.estado)) {
                                             if (ticket.fecha_maxima_atencion && ticket.fecha_atencion) {
                                                 const horasRes = calcularHorasLaborables(ticket.fecha_maxima_atencion, ticket.fecha_atencion, feriados);
                                                 
                                                 if (horasRes > 0) {
-                                                    // Cerró DESPUÉS del límite (Retraso)
                                                     resolucionJSX = <span style={{ color: '#dc2626', fontWeight: 'bold' }}>+{horasRes.toFixed(1)}h</span>;
                                                 } else {
-                                                    // Cerró ANTES o EXACTO al límite (A tiempo)
                                                     resolucionJSX = <span style={{ color: '#16a34a', fontWeight: 'bold' }}>{horasRes.toFixed(1)}h</span>;
                                                 }
                                             } else {
@@ -252,6 +259,10 @@ export default function Dashboard() {
                                                 <td className="t-id">{ticket.codigo_ticket}</td>
                                                 <td className="t-desc">{ticket.descripcion}</td>
                                                 <td className="t-app">{ticket.aplicacion || 'N/A'}</td>
+                                                
+                                                {/* 3. Agregamos el dato de la nueva columna (Fecha creación SD) */}
+                                                <td className="t-date">{formatearFecha(ticket.fecha_creacion_sd)}</td>
+                                                
                                                 <td className="text-center font-bold">{tAsignacion}</td>
                                                 <td className="text-center font-bold">{tLimite}</td>
                                                 <td className="text-center">{resolucionJSX}</td>
