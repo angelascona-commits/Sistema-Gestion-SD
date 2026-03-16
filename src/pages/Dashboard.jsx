@@ -12,10 +12,13 @@ export default function Dashboard() {
 
     const [modalAbierto, setModalAbierto] = useState(false);
     const [ticketSeleccionado, setTicketSeleccionado] = useState(null);
-
-    const [productos, setProductos] = useState([]);
     const [modalRetrasosAbierto, setModalRetrasosAbierto] = useState(false);
     const [feriados, setFeriados] = useState([]);
+
+    const [filtros, setFiltros] = useState({
+        estado: '', codigo_ticket: '', descripcion: '', aplicacion: '', responsable: ''
+    });
+    const [ordenConfig, setOrdenConfig] = useState({ columna: null, direccion: 'asc' });
 
     const calcularHorasLaborables = (fechaInicioStr, fechaFinStr, listaFeriados = []) => {
         if (!fechaInicioStr || !fechaFinStr) return 0;
@@ -81,25 +84,13 @@ export default function Dashboard() {
             if (errorAlarmas) throw errorAlarmas;
             setAlarmas(dataAlarmas || []);
 
-            // Pedimos los datos ordenados, mandando los nulos al final para que no interfieran
             const { data: dataTickets, error: errorTickets } = await supabase
                 .from('vista_tickets_completos')
                 .select('*')
-                .order('fecha_creacion_sd', { ascending: false, nullsFirst: false }) 
-                .limit(20); // Subí un poco el límite por si quieres ver más
+                .limit(100);
 
             if (errorTickets) throw errorTickets;
-
-            // REFUERZO: Forzamos el orden exacto usando JavaScript por fecha para evitar que se guíe por el ID
-            let ticketsOrdenados = dataTickets || [];
-            ticketsOrdenados.sort((a, b) => {
-                const fechaA = a.fecha_creacion_sd ? new Date(a.fecha_creacion_sd).getTime() : 0;
-                const fechaB = b.fecha_creacion_sd ? new Date(b.fecha_creacion_sd).getTime() : 0;
-                return fechaB - fechaA; // El mayor (más reciente) va primero
-            });
-
-            // Cortamos a los 10 más recientes ya ordenados correctamente
-            setTicketsRecientes(ticketsOrdenados.slice(0, 10));
+            setTicketsRecientes(dataTickets || []);
 
         } catch (error) {
             console.error("Error cargando el dashboard:", error.message);
@@ -113,7 +104,8 @@ export default function Dashboard() {
             case 'Pendiente': return 'status-open';
             case 'En proceso': return 'status-progress';
             case 'Atendido':
-            case 'Cerrado': return 'status-resolved';
+            case 'Cerrado':
+            case 'Resuelto': return 'status-resolved';
             default: return 'status-open';
         }
     };
@@ -123,17 +115,118 @@ export default function Dashboard() {
         const fecha = new Date(fechaIso);
         return fecha.toLocaleString('es-PE', {
             timeZone: 'UTC',
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
+            day: '2-digit', month: '2-digit', year: 'numeric',
+            hour: '2-digit', minute: '2-digit'
         });
     };
 
     const abrirModal = (numeroTicket) => {
         setTicketSeleccionado(numeroTicket);
         setModalAbierto(true);
+    };
+
+    const handleFiltroChange = (e) => {
+        const { name, value } = e.target;
+        setFiltros(prev => ({ ...prev, [name]: value }));
+    };
+
+    const manejarOrdenClick = (columna) => {
+        setOrdenConfig(prev => ({
+            columna,
+            direccion: prev.columna === columna && prev.direccion === 'asc' ? 'desc' : 'asc'
+        }));
+    };
+
+    const obtenerPesoEstado = (estado) => {
+        const est = (estado || '').toLowerCase();
+        if (est.includes('pendiente')) return 1;
+        if (est.includes('proceso')) return 2;
+        return 3;
+    };
+
+    const opcionesEstado = [...new Set(ticketsRecientes.map(t => t.estado).filter(Boolean))].sort();
+    const opcionesApp = [...new Set(ticketsRecientes.map(t => t.aplicacion).filter(Boolean))].sort();
+    const opcionesResponsable = [...new Set(ticketsRecientes.map(t => t.responsable).filter(Boolean))].sort();
+
+    let ticketsProcesados = ticketsRecientes.filter(ticket => {
+        const matchEstado = filtros.estado === '' || ticket.estado === filtros.estado;
+        const matchApp = filtros.aplicacion === '' || ticket.aplicacion === filtros.aplicacion;
+        const matchResp = filtros.responsable === '' || ticket.responsable === filtros.responsable;
+        
+        const matchId = (ticket.codigo_ticket || '').toLowerCase().includes(filtros.codigo_ticket.toLowerCase());
+        const matchDesc = (ticket.descripcion || '').toLowerCase().includes(filtros.descripcion.toLowerCase());
+
+        return matchEstado && matchApp && matchResp && matchId && matchDesc;
+    });
+
+    ticketsProcesados.sort((a, b) => {
+        if (ordenConfig.columna) {
+            let valA = a[ordenConfig.columna] || '';
+            let valB = b[ordenConfig.columna] || '';
+            
+            if (valA < valB) return ordenConfig.direccion === 'asc' ? -1 : 1;
+            if (valA > valB) return ordenConfig.direccion === 'asc' ? 1 : -1;
+            return 0;
+        } else {
+            const pesoA = obtenerPesoEstado(a.estado);
+            const pesoB = obtenerPesoEstado(b.estado);
+            
+            if (pesoA !== pesoB) {
+                return pesoA - pesoB;
+            }
+            
+            const fechaA = a.fecha_creacion_sd ? new Date(a.fecha_creacion_sd).getTime() : 0;
+            const fechaB = b.fecha_creacion_sd ? new Date(b.fecha_creacion_sd).getTime() : 0;
+            return fechaB - fechaA; 
+        }
+    });
+
+    // --- ESTILOS MODERNOS PARA LOS ENCABEZADOS DE FILTRO ---
+    const contenedorFiltro = {
+        display: 'flex',
+        alignItems: 'center',
+        backgroundColor: '#f8fafc', // Fondo gris muy suave
+        border: '1px solid #e2e8f0', // Borde sutil
+        borderRadius: '6px',
+        padding: '2px 6px',
+        boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.01)',
+        transition: 'border-color 0.2s'
+    };
+
+    const inputFiltro = {
+        flex: 1,
+        width: '100%',
+        minWidth: '0', 
+        padding: '6px 4px',
+        fontSize: '13px',
+        fontWeight: '600',
+        color: '#334155',
+        backgroundColor: 'transparent',
+        border: 'none',
+        outline: 'none',
+        cursor: 'pointer',
+        textOverflow: 'ellipsis'
+    };
+
+    const btnOrdenar = {
+        background: 'transparent',
+        border: 'none',
+        color: '#64748b',
+        cursor: 'pointer',
+        padding: '4px',
+        fontSize: '14px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: '4px'
+    };
+
+    // Helper para mostrar el ícono de orden correcto
+    const obtenerIconoOrden = (columna) => {
+        if (ordenConfig.columna === columna) {
+            return ordenConfig.direccion === 'asc' ? '↑' : '↓';
+        }
+        return '⇅';
     };
 
     if (cargando) {
@@ -163,11 +256,7 @@ export default function Dashboard() {
                             <span className="material-symbols-outlined alert-icon">notifications_active</span>
                             Alarma de Pendientes
                         </h2>
-                        <button 
-                            className="btn-link" 
-                            onClick={() => setModalRetrasosAbierto(true)}
-                            style={{ cursor: 'pointer' }}
-                        >
+                        <button className="btn-link" onClick={() => setModalRetrasosAbierto(true)} style={{ cursor: 'pointer' }}>
                             Ver todos los retrasos
                         </button>
                     </div>
@@ -200,32 +289,84 @@ export default function Dashboard() {
                 </section>
 
                 <section>
-                    <div className="section-header">
+                    <div className="section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <h2 className="section-title">Resumen de Tickets Recientes</h2>
+                        <span style={{ fontSize: '13px', color: '#64748b' }}>
+                            Mostrando {ticketsProcesados.length} tickets
+                        </span>
                     </div>
 
                     <div className="table-container">
                         <table className="ticket-table">
                             <thead>
                                 <tr>
-                                    <th>Ticket ID</th>
-                                    <th>Descripción</th>
-                                    <th>App / Módulo</th>
-                                    {/* 2. Agregamos el encabezado de la nueva columna */}
-                                    <th>Creación SD</th>
-                                    <th className="text-center">T. Asignación</th>
-                                    <th className="text-center">T. Límite SLA</th>
-                                    <th className="text-center">Resolución</th>
-                                    <th className="text-center">Estado</th>
-                                    <th>Designado</th>
-                                    <th>Registrado en App</th>
+                                    {/* COLUMNAS CON FILTRO INTEGRADO ELEGANTE */}
+                                    <th style={{ minWidth: '130px', padding: '8px' }}>
+                                        <div style={contenedorFiltro}>
+                                            <select name="estado" value={filtros.estado} onChange={handleFiltroChange} style={inputFiltro}>
+                                                <option value="">Estado</option>
+                                                {opcionesEstado.map(est => <option key={est} value={est}>{est}</option>)}
+                                            </select>
+                                            <button onClick={() => manejarOrdenClick('estado')} style={btnOrdenar} title="Ordenar">
+                                                {obtenerIconoOrden('estado')}
+                                            </button>
+                                        </div>
+                                    </th>
+
+                                    <th style={{ minWidth: '130px', padding: '8px' }}>
+                                        <div style={contenedorFiltro}>
+                                            <input type="text" name="codigo_ticket" placeholder="Ticket ID" value={filtros.codigo_ticket} onChange={handleFiltroChange} style={{...inputFiltro, cursor: 'text'}}/>
+                                            <button onClick={() => manejarOrdenClick('codigo_ticket')} style={btnOrdenar} title="Ordenar">
+                                                {obtenerIconoOrden('codigo_ticket')}
+                                            </button>
+                                        </div>
+                                    </th>
+
+                                    <th style={{ padding: '8px' }}>
+                                        <div style={contenedorFiltro}>
+                                            <input type="text" name="descripcion" placeholder="Buscar Descripción..." value={filtros.descripcion} onChange={handleFiltroChange} style={{...inputFiltro, cursor: 'text', fontWeight: 'normal'}}/>
+                                        </div>
+                                    </th>
+
+                                    <th style={{ minWidth: '150px', padding: '8px' }}>
+                                        <div style={contenedorFiltro}>
+                                            <select name="aplicacion" value={filtros.aplicacion} onChange={handleFiltroChange} style={inputFiltro}>
+                                                <option value="">App / Módulo</option>
+                                                {opcionesApp.map(app => <option key={app} value={app}>{app}</option>)}
+                                            </select>
+                                            <button onClick={() => manejarOrdenClick('aplicacion')} style={btnOrdenar} title="Ordenar">
+                                                {obtenerIconoOrden('aplicacion')}
+                                            </button>
+                                        </div>
+                                    </th>
+
+                                    {/* COLUMNAS SIMPLES DE ORDENAMIENTO */}
+                                    <th onClick={() => manejarOrdenClick('fecha_creacion_sd')} style={{cursor: 'pointer', whiteSpace: 'nowrap', color: '#334155', fontWeight: '600', padding: '12px 8px'}}>
+                                        Creación SD <span style={{color: '#64748b', fontSize: '14px', marginLeft:'4px'}}>{obtenerIconoOrden('fecha_creacion_sd')}</span>
+                                    </th>
+
+                                    <th className="text-center" style={{ whiteSpace: 'nowrap', color: '#334155', fontWeight: '600' }}>T. Asignación</th>
+                                    <th className="text-center" style={{ whiteSpace: 'nowrap', color: '#334155', fontWeight: '600' }}>T. Límite SLA</th>
+                                    <th className="text-center" style={{ color: '#334155', fontWeight: '600' }}>Resolución</th>
+
+                                    <th style={{ minWidth: '140px', padding: '8px' }}>
+                                        <div style={contenedorFiltro}>
+                                            <select name="responsable" value={filtros.responsable} onChange={handleFiltroChange} style={inputFiltro}>
+                                                <option value="">Designado</option>
+                                                {opcionesResponsable.map(resp => <option key={resp} value={resp}>{resp}</option>)}
+                                            </select>
+                                            <button onClick={() => manejarOrdenClick('responsable')} style={btnOrdenar} title="Ordenar">
+                                                {obtenerIconoOrden('responsable')}
+                                            </button>
+                                        </div>
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {ticketsRecientes.length === 0 ? (
-                                    <tr><td colSpan="10" className="text-center">No hay tickets registrados aún.</td></tr>
+                                {ticketsProcesados.length === 0 ? (
+                                    <tr><td colSpan="9" className="text-center" style={{ padding: '30px', color: '#64748b' }}>No se encontraron tickets.</td></tr>
                                 ) : (
-                                    ticketsRecientes.map((ticket) => {
+                                    ticketsProcesados.map((ticket) => {
                                         
                                         let tAsignacion = '-';
                                         if (ticket.fecha_creacion_sd && ticket.fecha_asignacion) {
@@ -256,21 +397,17 @@ export default function Dashboard() {
 
                                         return (
                                             <tr key={ticket.ticket_id} onClick={() => abrirModal(ticket.numero_ticket)} style={{ cursor: 'pointer' }}>
-                                                <td className="t-id">{ticket.codigo_ticket}</td>
-                                                <td className="t-desc">{ticket.descripcion}</td>
-                                                <td className="t-app">{ticket.aplicacion || 'N/A'}</td>
-                                                
-                                                {/* 3. Agregamos el dato de la nueva columna (Fecha creación SD) */}
-                                                <td className="t-date">{formatearFecha(ticket.fecha_creacion_sd)}</td>
-                                                
-                                                <td className="text-center font-bold">{tAsignacion}</td>
-                                                <td className="text-center font-bold">{tLimite}</td>
-                                                <td className="text-center">{resolucionJSX}</td>
                                                 <td className="text-center">
                                                     <span className={`status-pill ${obtenerClaseEstado(ticket.estado)}`}>{ticket.estado}</span>
                                                 </td>
+                                                <td className="t-id">{ticket.codigo_ticket}</td>
+                                                <td className="t-desc">{ticket.descripcion}</td>
+                                                <td className="t-app">{ticket.aplicacion || 'N/A'}</td>
+                                                <td className="t-date">{formatearFecha(ticket.fecha_creacion_sd)}</td>
+                                                <td className="text-center font-bold">{tAsignacion}</td>
+                                                <td className="text-center font-bold">{tLimite}</td>
+                                                <td className="text-center">{resolucionJSX}</td>
                                                 <td className="t-assigned">{ticket.responsable || 'Sin asignar'}</td>
-                                                <td className="t-date">{formatearFecha(ticket.fecha_registro)}</td>
                                             </tr>
                                         );
                                     })
@@ -282,7 +419,6 @@ export default function Dashboard() {
             </div>
 
             <TicketModal isOpen={modalAbierto} onClose={() => setModalAbierto(false)} numeroTicket={ticketSeleccionado} />
-            
             <RetrasosModal isOpen={modalRetrasosAbierto} onClose={() => setModalRetrasosAbierto(false)} />
         </div>
     );
