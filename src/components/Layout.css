@@ -19,4 +19,5 @@
   min-width: 0;
   overflow-y: auto;
   background-color: var(--bg-light);
+  zoom: 80%;
 }
