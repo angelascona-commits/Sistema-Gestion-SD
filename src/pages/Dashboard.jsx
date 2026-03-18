@@ -27,13 +27,13 @@ export default function Dashboard() {
     const calcularHorasLaborables = (fechaInicioStr, fechaFinStr, listaFeriados = []) => {
         if (!fechaInicioStr || !fechaFinStr) return 0;
         const limpiarFecha = (fecha) => String(fecha).replace(' ', 'T').substring(0, 16);
-        
+
         let inicio = new Date(limpiarFecha(fechaInicioStr));
         let fin = new Date(limpiarFecha(fechaFinStr));
         if (isNaN(inicio.getTime()) || isNaN(fin.getTime())) return 0;
 
         const feriadosSet = new Set(listaFeriados.map(f => {
-            if(!f.fecha) return f;
+            if (!f.fecha) return f;
             const [year, month, day] = f.fecha.split('T')[0].split('-');
             return `${year}-${month}-${day}`;
         }));
@@ -53,13 +53,13 @@ export default function Dashboard() {
             const dia = actual.getDay();
             const hora = actual.getHours();
             const fechaLocalStr = `${actual.getFullYear()}-${String(actual.getMonth() + 1).padStart(2, '0')}-${String(actual.getDate()).padStart(2, '0')}`;
-            
+
             if (dia >= 1 && dia <= 5 && hora >= 9 && hora < 18 && hora !== 13 && !feriadosSet.has(fechaLocalStr)) {
                 minutosLaborables++;
             }
             actual.setMinutes(actual.getMinutes() + 1);
         }
-        
+
         const horas = minutosLaborables / 60;
         return esNegativo ? -horas : horas;
     };
@@ -71,7 +71,7 @@ export default function Dashboard() {
     const cargarDatosDashboard = async () => {
         try {
             setCargando(true);
-            
+
             const { data: dataFeriados } = await supabase.from('feriados').select('fecha');
             const feriadosList = dataFeriados ? dataFeriados.map(f => f.fecha) : [];
             setFeriados(feriadosList);
@@ -131,14 +131,14 @@ export default function Dashboard() {
 
     const handleFiltroChange = (e) => {
         const { name, value, type, checked } = e.target;
-        setFiltros(prev => ({ 
-            ...prev, 
-            [name]: type === 'checkbox' ? checked : value 
+        setFiltros(prev => ({
+            ...prev,
+            [name]: type === 'checkbox' ? checked : value
         }));
     };
 
     const manejarOrdenClick = (columna, e) => {
-        e.stopPropagation(); 
+        e.stopPropagation();
         setOrdenConfig(prev => ({
             columna,
             direccion: prev.columna === columna && prev.direccion === 'asc' ? 'desc' : 'asc'
@@ -221,7 +221,7 @@ export default function Dashboard() {
         if (ordenConfig.columna) {
             let valA = a[ordenConfig.columna] || '';
             let valB = b[ordenConfig.columna] || '';
-            
+
             if (valA < valB) return ordenConfig.direccion === 'asc' ? -1 : 1;
             if (valA > valB) return ordenConfig.direccion === 'asc' ? 1 : -1;
             return 0;
@@ -230,17 +230,17 @@ export default function Dashboard() {
             const pesoA = obtenerPesoEstado(a.estado);
             const pesoB = obtenerPesoEstado(b.estado);
             if (pesoA !== pesoB) return pesoA - pesoB;
-            
+
             // --- AQUÍ APLICAMOS EL ORDEN POR FECHA DE ASIGNACIÓN (Más reciente primero) ---
             const fechaA = a.fecha_asignacion ? new Date(a.fecha_asignacion).getTime() : 0;
             const fechaB = b.fecha_asignacion ? new Date(b.fecha_asignacion).getTime() : 0;
-            return fechaB - fechaA; 
+            return fechaB - fechaA;
         }
     });
 
     const headerStyle = {
-        position: 'relative', 
-        padding: '12px 10px', 
+        position: 'relative',
+        padding: '12px 10px',
         verticalAlign: 'middle',
         cursor: 'pointer',
         userSelect: 'none',
@@ -287,7 +287,7 @@ export default function Dashboard() {
         display: 'flex',
         flexDirection: 'column',
         gap: '10px',
-        cursor: 'default' 
+        cursor: 'default'
     };
 
     const inputPopoverStyle = {
@@ -311,7 +311,7 @@ export default function Dashboard() {
             </div>
         );
     }
-    
+
     return (
         <div className="dashboard-container">
             <div className="dash-header">
@@ -378,7 +378,7 @@ export default function Dashboard() {
                                     <th style={headerStyle} onClick={() => toggleFiltroMenu('fecha_asignacion')}>
                                         <div style={headerContentStyle}>
                                             <span>F. Asignación</span>
-                                            <div style={{display: 'flex', gap: '4px'}}>
+                                            <div style={{ display: 'flex', gap: '4px' }}>
                                                 <button onClick={(e) => manejarOrdenClick('fecha_asignacion', e)} style={iconBtnStyle}>
                                                     {ordenConfig.columna === 'fecha_asignacion' ? (ordenConfig.direccion === 'asc' ? '↑' : '↓') : '⇅'}
                                                 </button>
@@ -389,17 +389,17 @@ export default function Dashboard() {
                                             <div style={popoverStyle} onClick={e => e.stopPropagation()}>
                                                 <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#475569' }}>Desde:</label>
                                                 <input type="date" name="fecha_asignacion_desde" value={filtros.fecha_asignacion_desde} onChange={handleFiltroChange} style={inputPopoverStyle} disabled={filtros.fecha_asignacion_vacia} />
-                                                
+
                                                 <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#475569', marginTop: '4px' }}>Hasta:</label>
                                                 <input type="date" name="fecha_asignacion_hasta" value={filtros.fecha_asignacion_hasta} onChange={handleFiltroChange} style={inputPopoverStyle} disabled={filtros.fecha_asignacion_vacia} />
-                                                
+
                                                 <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#475569', marginTop: '10px', cursor: 'pointer', fontWeight: 'bold' }}>
                                                     <input type="checkbox" name="fecha_asignacion_vacia" checked={filtros.fecha_asignacion_vacia} onChange={handleFiltroChange} style={{ cursor: 'pointer' }} />
                                                     Mostrar tickets sin asignar (vacíos)
                                                 </label>
 
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px' }}>
-                                                    <button onClick={() => limpiarFiltroColumna(['fecha_asignacion_desde', 'fecha_asignacion_hasta', 'fecha_asignacion_vacia'])} style={{...iconBtnStyle, color: '#dc2626', fontSize: '12px', fontWeight: 'bold'}}>Limpiar</button>
+                                                    <button onClick={() => limpiarFiltroColumna(['fecha_asignacion_desde', 'fecha_asignacion_hasta', 'fecha_asignacion_vacia'])} style={{ ...iconBtnStyle, color: '#dc2626', fontSize: '12px', fontWeight: 'bold' }}>Limpiar</button>
                                                     <button onClick={() => setFiltroActivo(null)} className="btn-primary" style={{ padding: '6px 10px', fontSize: '12px' }}>Aceptar</button>
                                                 </div>
                                             </div>
@@ -410,7 +410,7 @@ export default function Dashboard() {
                                     <th style={headerStyle} onClick={() => toggleFiltroMenu('fecha_creacion_sd')}>
                                         <div style={headerContentStyle}>
                                             <span>Creación SD</span>
-                                            <div style={{display: 'flex', gap: '4px'}}>
+                                            <div style={{ display: 'flex', gap: '4px' }}>
                                                 <button onClick={(e) => manejarOrdenClick('fecha_creacion_sd', e)} style={iconBtnStyle}>
                                                     {ordenConfig.columna === 'fecha_creacion_sd' ? (ordenConfig.direccion === 'asc' ? '↑' : '↓') : '⇅'}
                                                 </button>
@@ -421,7 +421,7 @@ export default function Dashboard() {
                                             <div style={popoverStyle} onClick={e => e.stopPropagation()}>
                                                 <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#475569' }}>Desde:</label>
                                                 <input type="date" name="fecha_creacion_sd_desde" value={filtros.fecha_creacion_sd_desde} onChange={handleFiltroChange} style={inputPopoverStyle} disabled={filtros.fecha_creacion_sd_vacia} />
-                                                
+
                                                 <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#475569', marginTop: '4px' }}>Hasta:</label>
                                                 <input type="date" name="fecha_creacion_sd_hasta" value={filtros.fecha_creacion_sd_hasta} onChange={handleFiltroChange} style={inputPopoverStyle} disabled={filtros.fecha_creacion_sd_vacia} />
 
@@ -431,7 +431,7 @@ export default function Dashboard() {
                                                 </label>
 
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px' }}>
-                                                    <button onClick={() => limpiarFiltroColumna(['fecha_creacion_sd_desde', 'fecha_creacion_sd_hasta', 'fecha_creacion_sd_vacia'])} style={{...iconBtnStyle, color: '#dc2626', fontSize: '12px', fontWeight: 'bold'}}>Limpiar</button>
+                                                    <button onClick={() => limpiarFiltroColumna(['fecha_creacion_sd_desde', 'fecha_creacion_sd_hasta', 'fecha_creacion_sd_vacia'])} style={{ ...iconBtnStyle, color: '#dc2626', fontSize: '12px', fontWeight: 'bold' }}>Limpiar</button>
                                                     <button onClick={() => setFiltroActivo(null)} className="btn-primary" style={{ padding: '6px 10px', fontSize: '12px' }}>Aceptar</button>
                                                 </div>
                                             </div>
@@ -442,7 +442,7 @@ export default function Dashboard() {
                                     <th style={headerStyle} onClick={() => toggleFiltroMenu('estado')}>
                                         <div style={headerContentStyle}>
                                             <span>Estado</span>
-                                            <div style={{display: 'flex', gap: '4px'}}>
+                                            <div style={{ display: 'flex', gap: '4px' }}>
                                                 <button onClick={(e) => manejarOrdenClick('estado', e)} style={iconBtnStyle}>
                                                     {ordenConfig.columna === 'estado' ? (ordenConfig.direccion === 'asc' ? '↑' : '↓') : '⇅'}
                                                 </button>
@@ -456,7 +456,7 @@ export default function Dashboard() {
                                                     {opcionesEstado.map(est => <option key={est} value={est}>{est}</option>)}
                                                 </select>
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px' }}>
-                                                    <button onClick={() => limpiarFiltroColumna(['estado'])} style={{...iconBtnStyle, color: '#dc2626', fontSize: '12px', fontWeight: 'bold'}}>Limpiar</button>
+                                                    <button onClick={() => limpiarFiltroColumna(['estado'])} style={{ ...iconBtnStyle, color: '#dc2626', fontSize: '12px', fontWeight: 'bold' }}>Limpiar</button>
                                                     <button onClick={() => setFiltroActivo(null)} className="btn-primary" style={{ padding: '6px 10px', fontSize: '12px' }}>Aceptar</button>
                                                 </div>
                                             </div>
@@ -467,7 +467,7 @@ export default function Dashboard() {
                                     <th style={headerStyle} onClick={() => toggleFiltroMenu('codigo_ticket')}>
                                         <div style={headerContentStyle}>
                                             <span>Ticket ID</span>
-                                            <div style={{display: 'flex', gap: '4px'}}>
+                                            <div style={{ display: 'flex', gap: '4px' }}>
                                                 <button onClick={(e) => manejarOrdenClick('codigo_ticket', e)} style={iconBtnStyle}>
                                                     {ordenConfig.columna === 'codigo_ticket' ? (ordenConfig.direccion === 'asc' ? '↑' : '↓') : '⇅'}
                                                 </button>
@@ -478,7 +478,7 @@ export default function Dashboard() {
                                             <div style={popoverStyle} onClick={e => e.stopPropagation()}>
                                                 <input type="text" name="codigo_ticket" placeholder="Buscar ID..." value={filtros.codigo_ticket} onChange={handleFiltroChange} style={inputPopoverStyle} autoFocus />
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px' }}>
-                                                    <button onClick={() => limpiarFiltroColumna(['codigo_ticket'])} style={{...iconBtnStyle, color: '#dc2626', fontSize: '12px', fontWeight: 'bold'}}>Limpiar</button>
+                                                    <button onClick={() => limpiarFiltroColumna(['codigo_ticket'])} style={{ ...iconBtnStyle, color: '#dc2626', fontSize: '12px', fontWeight: 'bold' }}>Limpiar</button>
                                                     <button onClick={() => setFiltroActivo(null)} className="btn-primary" style={{ padding: '6px 10px', fontSize: '12px' }}>Aceptar</button>
                                                 </div>
                                             </div>
@@ -486,7 +486,7 @@ export default function Dashboard() {
                                     </th>
 
                                     {/* 5. DESCRIPCIÓN */}
-                                    <th style={{...headerStyle, minWidth: '180px'}} onClick={() => toggleFiltroMenu('descripcion')}>
+                                    <th style={{ ...headerStyle, minWidth: '180px' }} onClick={() => toggleFiltroMenu('descripcion')}>
                                         <div style={headerContentStyle}>
                                             <span>Descripción</span>
                                             <span className="material-symbols-outlined" style={{ fontSize: '16px', color: tieneFiltroActivo(['descripcion']) ? '#2563eb' : '#94a3b8' }}>filter_alt</span>
@@ -495,7 +495,7 @@ export default function Dashboard() {
                                             <div style={popoverStyle} onClick={e => e.stopPropagation()}>
                                                 <input type="text" name="descripcion" placeholder="Palabra clave..." value={filtros.descripcion} onChange={handleFiltroChange} style={inputPopoverStyle} autoFocus />
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px' }}>
-                                                    <button onClick={() => limpiarFiltroColumna(['descripcion'])} style={{...iconBtnStyle, color: '#dc2626', fontSize: '12px', fontWeight: 'bold'}}>Limpiar</button>
+                                                    <button onClick={() => limpiarFiltroColumna(['descripcion'])} style={{ ...iconBtnStyle, color: '#dc2626', fontSize: '12px', fontWeight: 'bold' }}>Limpiar</button>
                                                     <button onClick={() => setFiltroActivo(null)} className="btn-primary" style={{ padding: '6px 10px', fontSize: '12px' }}>Aceptar</button>
                                                 </div>
                                             </div>
@@ -506,7 +506,7 @@ export default function Dashboard() {
                                     <th style={headerStyle} onClick={() => toggleFiltroMenu('aplicacion')}>
                                         <div style={headerContentStyle}>
                                             <span>Aplicación</span>
-                                            <div style={{display: 'flex', gap: '4px'}}>
+                                            <div style={{ display: 'flex', gap: '4px' }}>
                                                 <button onClick={(e) => manejarOrdenClick('aplicacion', e)} style={iconBtnStyle}>
                                                     {ordenConfig.columna === 'aplicacion' ? (ordenConfig.direccion === 'asc' ? '↑' : '↓') : '⇅'}
                                                 </button>
@@ -520,7 +520,7 @@ export default function Dashboard() {
                                                     {opcionesApp.map(app => <option key={app} value={app}>{app}</option>)}
                                                 </select>
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px' }}>
-                                                    <button onClick={() => limpiarFiltroColumna(['aplicacion'])} style={{...iconBtnStyle, color: '#dc2626', fontSize: '12px', fontWeight: 'bold'}}>Limpiar</button>
+                                                    <button onClick={() => limpiarFiltroColumna(['aplicacion'])} style={{ ...iconBtnStyle, color: '#dc2626', fontSize: '12px', fontWeight: 'bold' }}>Limpiar</button>
                                                     <button onClick={() => setFiltroActivo(null)} className="btn-primary" style={{ padding: '6px 10px', fontSize: '12px' }}>Aceptar</button>
                                                 </div>
                                             </div>
@@ -528,15 +528,15 @@ export default function Dashboard() {
                                     </th>
 
                                     {/* 7, 8, 9 KPIs */}
-                                    <th className="text-center" style={{ ...headerStyle, cursor: 'default' }}><div style={{...headerContentStyle, justifyContent: 'center'}}>T. Asig</div></th>
-                                    <th className="text-center" style={{ ...headerStyle, cursor: 'default' }}><div style={{...headerContentStyle, justifyContent: 'center'}}>T. Límite</div></th>
-                                    <th className="text-center" style={{ ...headerStyle, cursor: 'default' }}><div style={{...headerContentStyle, justifyContent: 'center'}}>Resolución</div></th>
+                                    <th className="text-center" style={{ ...headerStyle, cursor: 'default' }}><div style={{ ...headerContentStyle, justifyContent: 'center' }}>T. Asig</div></th>
+                                    <th className="text-center" style={{ ...headerStyle, cursor: 'default' }}><div style={{ ...headerContentStyle, justifyContent: 'center' }}>T. Límite</div></th>
+                                    <th className="text-center" style={{ ...headerStyle, cursor: 'default' }}><div style={{ ...headerContentStyle, justifyContent: 'center' }}>Resolución</div></th>
 
                                     {/* 10. RESPONSABLE */}
                                     <th style={headerStyle} onClick={() => toggleFiltroMenu('responsable')}>
                                         <div style={headerContentStyle}>
                                             <span>Designado a</span>
-                                            <div style={{display: 'flex', gap: '4px'}}>
+                                            <div style={{ display: 'flex', gap: '4px' }}>
                                                 <button onClick={(e) => manejarOrdenClick('responsable', e)} style={iconBtnStyle}>
                                                     {ordenConfig.columna === 'responsable' ? (ordenConfig.direccion === 'asc' ? '↑' : '↓') : '⇅'}
                                                 </button>
@@ -550,7 +550,7 @@ export default function Dashboard() {
                                                     {opcionesResponsable.map(resp => <option key={resp} value={resp}>{resp}</option>)}
                                                 </select>
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px' }}>
-                                                    <button onClick={() => limpiarFiltroColumna(['responsable'])} style={{...iconBtnStyle, color: '#dc2626', fontSize: '12px', fontWeight: 'bold'}}>Limpiar</button>
+                                                    <button onClick={() => limpiarFiltroColumna(['responsable'])} style={{ ...iconBtnStyle, color: '#dc2626', fontSize: '12px', fontWeight: 'bold' }}>Limpiar</button>
                                                     <button onClick={() => setFiltroActivo(null)} className="btn-primary" style={{ padding: '6px 10px', fontSize: '12px' }}>Aceptar</button>
                                                 </div>
                                             </div>
@@ -563,23 +563,25 @@ export default function Dashboard() {
                                     <tr><td colSpan="10" className="text-center" style={{ padding: '40px', color: '#64748b', fontSize: '15px' }}>No se encontraron tickets con los filtros actuales.</td></tr>
                                 ) : (
                                     ticketsProcesados.map((ticket) => {
-                                        
-                                        // --- LÓGICA DE TIEMPO DE ASIGNACIÓN (DÍAS) ---
+
                                         let tAsignacionJSX = '-';
                                         if (ticket.fecha_creacion_sd && ticket.fecha_asignacion) {
                                             let horasAsig = calcularHorasLaborables(ticket.fecha_creacion_sd, ticket.fecha_asignacion, feriados);
-                                            if (horasAsig < 0) horasAsig = 0; 
-                                            const diasAsig = horasAsig / 8; // Basado en 8 horas por la exclusión del almuerzo
-                                            tAsignacionJSX = `${diasAsig.toFixed(1)}d`;
+                                            if (horasAsig < 0) horasAsig = 0;
+                                            const diasAsig = horasAsig / 8;
+                                             if (diasAsig > 1) {
+                                                tAsignacionJSX = <span style={{ color: '#dc2626', fontWeight: 'bold' }}>{diasAsig.toFixed(1)}d</span>;
+                                            } else {
+                                                tAsignacionJSX = <span style={{ color: '#16a34a', fontWeight: 'bold' }}>{diasAsig.toFixed(1)}d</span>;
+                                            }
                                         }
 
-                                        // --- LÓGICA DE TIEMPO LÍMITE (DÍAS Y SEMÁFORO) ---
                                         let tLimiteJSX = '-';
                                         if (ticket.fecha_asignacion && ticket.fecha_maxima_atencion) {
                                             let horasLim = calcularHorasLaborables(ticket.fecha_asignacion, ticket.fecha_maxima_atencion, feriados);
-                                            if (horasLim < 0) horasLim = 0; 
-                                            const diasLim = horasLim / 8; // Basado en 8 horas
-                                            
+                                            if (horasLim < 0) horasLim = 0;
+                                            const diasLim = horasLim / 8; 
+
                                             if (diasLim < 2) {
                                                 tLimiteJSX = <span style={{ color: '#dc2626', fontWeight: 'bold' }}>{diasLim.toFixed(1)}d</span>;
                                             } else {
@@ -591,7 +593,7 @@ export default function Dashboard() {
                                         if (['Cerrado', 'Atendido', 'Resuelto'].includes(ticket.estado)) {
                                             if (ticket.fecha_maxima_atencion && ticket.fecha_atencion) {
                                                 const horasRes = calcularHorasLaborables(ticket.fecha_maxima_atencion, ticket.fecha_atencion, feriados);
-                                                
+
                                                 if (horasRes > 0) {
                                                     resolucionJSX = <span style={{ color: '#dc2626', fontWeight: 'bold' }}>+{horasRes.toFixed(1)}h</span>;
                                                 } else {
@@ -612,10 +614,10 @@ export default function Dashboard() {
                                                 <td className="t-id" style={{ padding: '12px 10px', fontWeight: '600' }}>{ticket.codigo_ticket}</td>
                                                 <td className="t-desc" style={{ padding: '12px 10px' }}>{ticket.descripcion}</td>
                                                 <td className="t-app" style={{ padding: '12px 10px' }}>{ticket.aplicacion || 'N/A'}</td>
-                                                
+
                                                 <td className="text-center font-bold" style={{ padding: '12px 10px' }}>{tAsignacionJSX}</td>
                                                 <td className="text-center" style={{ padding: '12px 10px' }}>{tLimiteJSX}</td>
-                                                
+
                                                 <td className="text-center" style={{ padding: '12px 10px' }}>{resolucionJSX}</td>
                                                 <td className="t-assigned" style={{ padding: '12px 10px' }}>{ticket.responsable || 'Sin asignar'}</td>
                                             </tr>
