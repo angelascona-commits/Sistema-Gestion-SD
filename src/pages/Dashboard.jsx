@@ -23,6 +23,7 @@ export default function Dashboard() {
     const [ordenConfig, setOrdenConfig] = useState({ columna: null, direccion: 'asc' });
     const [filtroActivo, setFiltroActivo] = useState(null);
 
+    // --- FUNCIÓN DE CÁLCULO MEJORADA CON HORA DE ALMUERZO ---
     const calcularHorasLaborables = (fechaInicioStr, fechaFinStr, listaFeriados = []) => {
         if (!fechaInicioStr || !fechaFinStr) return 0;
         const limpiarFecha = (fecha) => String(fecha).replace(' ', 'T').substring(0, 16);
@@ -53,7 +54,7 @@ export default function Dashboard() {
             const hora = actual.getHours();
             const fechaLocalStr = `${actual.getFullYear()}-${String(actual.getMonth() + 1).padStart(2, '0')}-${String(actual.getDate()).padStart(2, '0')}`;
             
-            if (dia >= 1 && dia <= 5 && hora >= 9 && hora < 18 && !feriadosSet.has(fechaLocalStr)) {
+            if (dia >= 1 && dia <= 5 && hora >= 9 && hora < 18 && hora !== 13 && !feriadosSet.has(fechaLocalStr)) {
                 minutosLaborables++;
             }
             actual.setMinutes(actual.getMinutes() + 1);
@@ -166,7 +167,6 @@ export default function Dashboard() {
     const opcionesApp = [...new Set(ticketsRecientes.map(t => t.aplicacion).filter(Boolean))].sort();
     const opcionesResponsable = [...new Set(ticketsRecientes.map(t => t.responsable).filter(Boolean))].sort();
 
-    // --- LÓGICA DE FILTRADO: OCULTA VACÍOS POR DEFECTO ---
     let ticketsProcesados = ticketsRecientes.filter(ticket => {
         const matchEstado = filtros.estado === '' || ticket.estado === filtros.estado;
         const matchApp = filtros.aplicacion === '' || ticket.aplicacion === filtros.aplicacion;
@@ -176,10 +176,10 @@ export default function Dashboard() {
 
         let matchFechaAsignacion = true;
         if (filtros.fecha_asignacion_vacia) {
-            matchFechaAsignacion = !ticket.fecha_asignacion; // Solo muestra vacíos si se marca el check
+            matchFechaAsignacion = !ticket.fecha_asignacion;
         } else {
             if (!ticket.fecha_asignacion) {
-                matchFechaAsignacion = false; // DE PRIMERAS OCULTA LOS VACÍOS
+                matchFechaAsignacion = false;
             } else {
                 matchFechaAsignacion = true;
                 if (filtros.fecha_asignacion_desde) {
@@ -199,7 +199,7 @@ export default function Dashboard() {
             matchFechaCreacion = !ticket.fecha_creacion_sd;
         } else {
             if (!ticket.fecha_creacion_sd) {
-                matchFechaCreacion = false; // DE PRIMERAS OCULTA LOS VACÍOS
+                matchFechaCreacion = false;
             } else {
                 matchFechaCreacion = true;
                 if (filtros.fecha_creacion_sd_desde) {
@@ -226,17 +226,18 @@ export default function Dashboard() {
             if (valA > valB) return ordenConfig.direccion === 'asc' ? 1 : -1;
             return 0;
         } else {
+            // Mantiene el orden de Pendientes > En proceso > Atendidos/Cerrados
             const pesoA = obtenerPesoEstado(a.estado);
             const pesoB = obtenerPesoEstado(b.estado);
             if (pesoA !== pesoB) return pesoA - pesoB;
             
-            const fechaA = a.fecha_creacion_sd ? new Date(a.fecha_creacion_sd).getTime() : 0;
-            const fechaB = b.fecha_creacion_sd ? new Date(b.fecha_creacion_sd).getTime() : 0;
+            // --- AQUÍ APLICAMOS EL ORDEN POR FECHA DE ASIGNACIÓN (Más reciente primero) ---
+            const fechaA = a.fecha_asignacion ? new Date(a.fecha_asignacion).getTime() : 0;
+            const fechaB = b.fecha_asignacion ? new Date(b.fecha_asignacion).getTime() : 0;
             return fechaB - fechaA; 
         }
     });
 
-    // --- ESTILOS DE UI ---
     const headerStyle = {
         position: 'relative', 
         padding: '12px 10px', 
@@ -245,7 +246,8 @@ export default function Dashboard() {
         userSelect: 'none',
         backgroundColor: '#f8fafc',
         borderBottom: '2px solid #e2e8f0',
-        minWidth: '130px'
+        minWidth: '130px',
+        zIndex: 10 /* <--- AGREGA ESTA LÍNEA AQUÍ */
     };
 
     const headerContentStyle = {
@@ -280,7 +282,7 @@ export default function Dashboard() {
         borderRadius: '8px',
         padding: '12px',
         boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-        zIndex: 50,
+        zIndex: 9999, /* <--- CAMBIA ESTO (antes estaba en 50) */
         minWidth: '220px',
         display: 'flex',
         flexDirection: 'column',
@@ -370,7 +372,7 @@ export default function Dashboard() {
 
                     <div className="table-container" style={{ borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                         <table className="ticket-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
-                            <thead>
+                            <thead style={{ position: 'relative', zIndex: 100 }}>
                                 <tr>
                                     {/* 1. FECHA DE ASIGNACIÓN */}
                                     <th style={headerStyle} onClick={() => toggleFiltroMenu('fecha_asignacion')}>
@@ -562,16 +564,27 @@ export default function Dashboard() {
                                 ) : (
                                     ticketsProcesados.map((ticket) => {
                                         
-                                        let tAsignacion = '-';
+                                        // --- LÓGICA DE TIEMPO DE ASIGNACIÓN (DÍAS) ---
+                                        let tAsignacionJSX = '-';
                                         if (ticket.fecha_creacion_sd && ticket.fecha_asignacion) {
-                                            const horasAsig = calcularHorasLaborables(ticket.fecha_creacion_sd, ticket.fecha_asignacion, feriados);
-                                            tAsignacion = `${horasAsig.toFixed(1)}h`;
+                                            let horasAsig = calcularHorasLaborables(ticket.fecha_creacion_sd, ticket.fecha_asignacion, feriados);
+                                            if (horasAsig < 0) horasAsig = 0; 
+                                            const diasAsig = horasAsig / 8; // Basado en 8 horas por la exclusión del almuerzo
+                                            tAsignacionJSX = `${diasAsig.toFixed(1)}d`;
                                         }
 
-                                        let tLimite = '-';
+                                        // --- LÓGICA DE TIEMPO LÍMITE (DÍAS Y SEMÁFORO) ---
+                                        let tLimiteJSX = '-';
                                         if (ticket.fecha_asignacion && ticket.fecha_maxima_atencion) {
-                                            const horasLim = calcularHorasLaborables(ticket.fecha_asignacion, ticket.fecha_maxima_atencion, feriados);
-                                            tLimite = `${horasLim.toFixed(1)}h`;
+                                            let horasLim = calcularHorasLaborables(ticket.fecha_asignacion, ticket.fecha_maxima_atencion, feriados);
+                                            if (horasLim < 0) horasLim = 0; 
+                                            const diasLim = horasLim / 8; // Basado en 8 horas
+                                            
+                                            if (diasLim < 2) {
+                                                tLimiteJSX = <span style={{ color: '#dc2626', fontWeight: 'bold' }}>{diasLim.toFixed(1)}d</span>;
+                                            } else {
+                                                tLimiteJSX = <span style={{ color: '#16a34a', fontWeight: 'bold' }}>{diasLim.toFixed(1)}d</span>;
+                                            }
                                         }
 
                                         let resolucionJSX = <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>En proceso</span>;
@@ -599,8 +612,10 @@ export default function Dashboard() {
                                                 <td className="t-id" style={{ padding: '12px 10px', fontWeight: '600' }}>{ticket.codigo_ticket}</td>
                                                 <td className="t-desc" style={{ padding: '12px 10px' }}>{ticket.descripcion}</td>
                                                 <td className="t-app" style={{ padding: '12px 10px' }}>{ticket.aplicacion || 'N/A'}</td>
-                                                <td className="text-center font-bold" style={{ padding: '12px 10px' }}>{tAsignacion}</td>
-                                                <td className="text-center font-bold" style={{ padding: '12px 10px' }}>{tLimite}</td>
+                                                
+                                                <td className="text-center font-bold" style={{ padding: '12px 10px' }}>{tAsignacionJSX}</td>
+                                                <td className="text-center" style={{ padding: '12px 10px' }}>{tLimiteJSX}</td>
+                                                
                                                 <td className="text-center" style={{ padding: '12px 10px' }}>{resolucionJSX}</td>
                                                 <td className="t-assigned" style={{ padding: '12px 10px' }}>{ticket.responsable || 'Sin asignar'}</td>
                                             </tr>

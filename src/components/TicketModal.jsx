@@ -29,7 +29,7 @@ export default function TicketModal({ isOpen, onClose, numeroTicket }) {
 
     const limpiarFecha = (fecha) => {
       const str = String(fecha).replace(' ', 'T');
-      return str.substring(0, 16); 
+      return str.substring(0, 16);
     };
 
     const inicio = new Date(limpiarFecha(fechaInicioStr));
@@ -48,19 +48,19 @@ export default function TicketModal({ isOpen, onClose, numeroTicket }) {
     while (actual < fin) {
       const dia = actual.getDay();
       const hora = actual.getHours();
-      
+
       const yyyy = actual.getFullYear();
       const mm = String(actual.getMonth() + 1).padStart(2, '0');
       const dd = String(actual.getDate()).padStart(2, '0');
       const fechaLocalStr = `${yyyy}-${mm}-${dd}`;
-      
+
       if (dia >= 1 && dia <= 5 && hora >= 9 && hora < 18 && !feriadosSet.has(fechaLocalStr)) {
         minutosLaborables++;
       }
-      
+
       actual.setMinutes(actual.getMinutes() + 1);
     }
-    
+
     return minutosLaborables / 60;
   };
 
@@ -356,11 +356,11 @@ export default function TicketModal({ isOpen, onClose, numeroTicket }) {
 
     } catch (error) {
       console.error('Error:', error);
-      Swal.fire({ 
-        icon: 'error', 
-        title: 'Error al guardar', 
-        text: error.message || 'Hubo un error inesperado en la base de datos.', 
-        confirmButtonColor: '#ea580c' 
+      Swal.fire({
+        icon: 'error',
+        title: 'Error al guardar',
+        text: error.message || 'Hubo un error inesperado en la base de datos.',
+        confirmButtonColor: '#ea580c'
       });
     }
   }
@@ -390,7 +390,7 @@ export default function TicketModal({ isOpen, onClose, numeroTicket }) {
   if (formData.fecha_atencion && formData.fecha_maxima_atencion) {
     const limite = new Date(formData.fecha_maxima_atencion);
     const cierre = new Date(formData.fecha_atencion);
-    
+
     if (cierre > limite) {
       superaCierre = true;
       const difHrs = calcularHorasLaborables(formData.fecha_maxima_atencion, formData.fecha_atencion, feriados);
@@ -450,40 +450,6 @@ export default function TicketModal({ isOpen, onClose, numeroTicket }) {
                       <option value="Incidente">Incidente</option>
                     </select>
                   </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', backgroundColor: 'var(--slate-50)', padding: '12px', borderRadius: '8px', border: '1px solid var(--slate-200)', marginBottom: '20px' }}>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label>DNI Cliente</label>
-                    <input type="text" className="form-control" name="dni" placeholder="Opcional" value={formData.dni} onChange={handleChange} />
-                  </div>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label>Póliza</label>
-                    <input type="text" className="form-control" name="poliza" placeholder="Opcional" value={formData.poliza} onChange={handleChange} />
-                  </div>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label>Prioridad</label>
-                    <select className="form-control" name="prioridad_id" value={formData.prioridad_id} onChange={handleChange}>
-                      <option value="">-- Seleccionar --</option>
-                      {prioridades.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
-                    </select>
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                  <div className="form-group">
-                    <label>Asignado a</label>
-                    <select className="form-control" name="responsable_id" value={formData.responsable_id} onChange={handleChange}>
-                      <option value="">-- Sin asignar --</option>
-                      {responsables.map(r => <option key={r.id} value={r.id}>{r.nombre}</option>)}
-                    </select>
-                    {formData.horario_laboral && (
-                      <small style={{ color: '#0369a1', fontSize: '11px', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <span className="material-symbols-outlined" style={{ fontSize: '12px' }}>schedule</span>
-                        Horario del agente: {formData.horario_laboral}
-                      </small>
-                    )}
-                  </div>
                   <div className="form-group">
                     <label>Estado</label>
                     <select className="form-control" name="estado_id" value={formData.estado_id} onChange={handleChange}>
@@ -492,7 +458,6 @@ export default function TicketModal({ isOpen, onClose, numeroTicket }) {
                     </select>
                   </div>
                 </div>
-
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr ', gap: '16px' }}>
                   <div className="form-group">
                     <label>Aplicación</label>
@@ -515,7 +480,38 @@ export default function TicketModal({ isOpen, onClose, numeroTicket }) {
                       {estadosJira.map(ej => <option key={ej.id} value={ej.id}>{ej.nombre}</option>)}
                     </select>
                   </div>
+                  <div className="form-group">
+                    <label>Asignado a</label>
+                    <select className="form-control" name="responsable_id" value={formData.responsable_id} onChange={handleChange}>
+                      <option value="">-- Sin asignar --</option>
+                      {responsables.map(r => <option key={r.id} value={r.id}>{r.nombre}</option>)}
+                    </select>
+                    {formData.horario_laboral && (
+                      <small style={{ color: '#0369a1', fontSize: '11px', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: '12px' }}>schedule</span>
+                        Horario del agente: {formData.horario_laboral}
+                      </small>
+                    )}
+                  </div>
                 </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', backgroundColor: 'var(--slate-50)', padding: '12px', borderRadius: '8px', border: '1px solid var(--slate-200)', marginBottom: '20px' }}>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label>DNI Cliente</label>
+                    <input type="text" className="form-control" name="dni" placeholder="Opcional" value={formData.dni} onChange={handleChange} />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label>Póliza</label>
+                    <input type="text" className="form-control" name="poliza" placeholder="Opcional" value={formData.poliza} onChange={handleChange} />
+                  </div>
+
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+
+                </div>
+
+
 
                 <div style={{ padding: '16px', backgroundColor: 'var(--slate-50)', borderRadius: '8px', marginBottom: '20px', border: '1px solid var(--slate-200)' }}>
 
@@ -546,7 +542,7 @@ export default function TicketModal({ isOpen, onClose, numeroTicket }) {
                       <input type="datetime-local" className="form-control" name="fecha_maxima_atencion" value={formatearParaInput(formData.fecha_maxima_atencion)} onChange={handleChange} />
                       {formData.fecha_asignacion && formData.fecha_maxima_atencion && (
                         <small style={{ color: tiempoInsuficiente ? '#dc2626' : '#16a34a', fontWeight: '600', fontSize: '11px', marginTop: '4px', display: 'block' }}>
-                          {tiempoInsuficiente ? '⚠️ Tiempo insuficiente: Es menor a 16h laborables desde la asignación' : '✅ Tiempo de SLA correcto'}
+                          {tiempoInsuficiente ? '⚠️ Tiempo insuficiente: Es menor a 16h laborables desde la asignación' : '✅ Tiempo  correcto'}
                         </small>
                       )}
                     </div>
@@ -567,23 +563,18 @@ export default function TicketModal({ isOpen, onClose, numeroTicket }) {
                         )}
                       </div>
                     )}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
 
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label>Fecha Estimada</label>
-                    <input type="datetime-local" className="form-control" name="fecha_estimada" value={formatearParaInput(formData.fecha_estimada)} onChange={handleChange} />
-                  </div>
-                  {isEditing && (
-                    <div className="form-group" style={{ marginBottom: 0 }}>
-                      <label>Horas Invertidas</label>
-                      <input type="number" step="0.1" className="form-control" name="horas_invertidas" value={formData.horas_invertidas} onChange={handleChange} />
+                      {isEditing && (
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label>Horas Invertidas</label>
+                          <input type="number" step="0.1" className="form-control" name="horas_invertidas" value={formData.horas_invertidas} onChange={handleChange} />
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
 
+                  </div>
+                </div>
                 <div className="form-group" style={{ marginTop: '16px' }}>
                   <label>Observaciones</label>
                   <textarea className="form-control" rows="2" name="observaciones" value={formData.observaciones} onChange={handleChange} />
