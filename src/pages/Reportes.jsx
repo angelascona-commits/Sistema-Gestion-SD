@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import * as XLSX from 'xlsx';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 import './Reportes.css';
 
 export default function Reportes() {
@@ -210,11 +210,10 @@ export default function Reportes() {
         XLSX.writeFile(libro, `Reporte_SLA_${fechaHoy}.xlsx`);
     };
 
-    // --- NUEVO: GENERAR PDF PROFESIONAL ---
     const descargarPDF = () => {
         if (!reportes.length) return alert("No hay datos para exportar.");
 
-        const doc = new jsPDF('landscape'); // Formato horizontal para que quepa la tabla
+        const doc = new jsPDF('landscape'); 
         const fechaHoy = new Date().toISOString().slice(0, 10);
 
         // Título principal
@@ -224,8 +223,7 @@ export default function Reportes() {
         doc.setTextColor(100);
         doc.text(`Generado el: ${fechaHoy}`, 14, 28);
 
-        // Tabla 1: Resumen (Promedios y Totales)
-        doc.autoTable({
+        autoTable(doc, {
             startY: 35,
             head: [["Total Creados", "Abiertos", "Resueltos", "Prom. Asignación (días)", "Prom. Resolución (días)", "Fuera de SLA"]],
             body: [[
@@ -237,12 +235,11 @@ export default function Reportes() {
                 resumen.fueraSlaAsignacion + resumen.fueraSlaAtencion
             ]],
             theme: 'grid',
-            headStyles: { fillColor: [59, 130, 246] } // Color azul
+            headStyles: { fillColor: [59, 130, 246] } 
         });
 
-        // Tabla 2: Detalle de Tickets
-        doc.autoTable({
-            startY: doc.lastAutoTable.finalY + 15, // Empieza debajo de la anterior
+        autoTable(doc, {
+            startY: doc.lastAutoTable.finalY + 15, 
             head: [["Ticket", "Prioridad", "Responsable", "Fecha Creación", "T. Asignación", "SLA Máximo", "T. Resolución", "Retraso", "Estado"]],
             body: reportes.map(rep => [
                 rep.codigo_ticket,
@@ -256,8 +253,8 @@ export default function Reportes() {
                 rep.estado || 'Abierto'
             ]),
             theme: 'striped',
-            headStyles: { fillColor: [51, 65, 85] }, // Color gris oscuro
-            styles: { fontSize: 8 } // Letra pequeña para que entren todas las columnas
+            headStyles: { fillColor: [51, 65, 85] }, 
+            styles: { fontSize: 8 } 
         });
 
         doc.save(`Reporte_SLA_${fechaHoy}.pdf`);
