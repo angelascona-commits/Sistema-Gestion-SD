@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { supabase } from '../services/supabase';
+import { supabase } from '@/services/supabase';
 import TicketModal from '../components/TicketModal';
 import Swal from 'sweetalert2';
 import RetrasosModal from '../components/RetrasosModal';
@@ -91,7 +91,7 @@ export default function Dashboard() {
             const { data: dataTickets, error: errorTickets } = await supabase
                 .from('vista_tickets_completos')
                 .select('*')
-                .limit(200);
+                .limit(400);
 
             if (errorTickets) throw errorTickets;
             setTicketsRecientes(dataTickets || []);

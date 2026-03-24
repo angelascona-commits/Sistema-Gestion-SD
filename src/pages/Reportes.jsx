@@ -7,19 +7,21 @@ import './Reportes.css';
 
 export default function Reportes() {
     const [todosLosTickets, setTodosLosTickets] = useState([]);
-    const [reportes, setReportes] = useState([]); 
+    const [reportes, setReportes] = useState([]);
     const [cargando, setCargando] = useState(true);
     const [usuarioActual, setUsuarioActual] = useState(null);
 
-    const [filtroTipo, setFiltroTipo] = useState('todos'); 
-    const [filtroMes, setFiltroMes] = useState(''); 
+    const [filtroTipo, setFiltroTipo] = useState('todos');
+    const [filtroMes, setFiltroMes] = useState('');
     const [filtroInicio, setFiltroInicio] = useState('');
     const [filtroFin, setFiltroFin] = useState('');
+    const [filtroSemana, setFiltroSemana] = useState('');
+    const [semanasDisponibles, setSemanasDisponibles] = useState([]);
 
     const [resumen, setResumen] = useState({
         totalTickets: 0, abiertos: 0, atendidos: 0,
-        fueraSlaAsignacion: 0, fueraSlaAtencion: 0,     
-        promedioDiasAsignacion: 0, promedioDiasAtencion: 0    
+        fueraSlaAsignacion: 0, fueraSlaAtencion: 0,
+        promedioDiasAsignacion: 0, promedioDiasAtencion: 0
     });
 
     const calcularDiasLaborables = (fechaInicioStr, fechaFinStr, listaFeriados = []) => {
@@ -53,9 +55,36 @@ export default function Reportes() {
             }
             actual.setMinutes(actual.getMinutes() + 1);
         }
-        return minutosLaborables / 540; 
+        return minutosLaborables / 540;
     };
+    const generarSemanasDisponibles = (tickets) => {
+        const semanas = new Map();
+        tickets.forEach(t => {
+            if (!t.fecha_creacion_sd) return;
 
+            const fecha = new Date(t.fecha_creacion_sd);
+            const dia = fecha.getDay();
+
+            // Calcular el lunes
+            const diff = fecha.getDate() - dia + (dia === 0 ? -6 : 1);
+            const lunes = new Date(fecha);
+            lunes.setDate(diff);
+            lunes.setHours(0, 0, 0, 0);
+
+            // Calcular el domingo
+            const domingo = new Date(lunes);
+            domingo.setDate(lunes.getDate() + 6);
+            domingo.setHours(23, 59, 59, 999);
+
+            const value = `${lunes.getTime()}|${domingo.getTime()}`;
+            const label = `${lunes.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })} al ${domingo.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })}`;
+
+            if (!semanas.has(value)) {
+                semanas.set(value, { value, label, time: lunes.getTime() });
+            }
+        });
+        return Array.from(semanas.values()).sort((a, b) => b.time - a.time);
+    };
     useEffect(() => {
         const cargarDatos = async () => {
             setCargando(true);
@@ -79,19 +108,19 @@ export default function Reportes() {
                 if (error) throw error;
 
                 const datosCorregidos = (data || []).map(ticket => {
-                    const estadoTicket = ticket.estado || ''; 
+                    const estadoTicket = ticket.estado || '';
                     let diasAsignacion = null, asigFueraTiempo = false;
-                    
+
                     if (ticket.fecha_creacion_sd && ticket.fecha_asignacion) {
                         diasAsignacion = calcularDiasLaborables(ticket.fecha_creacion_sd, ticket.fecha_asignacion, feriadosList);
-                        asigFueraTiempo = diasAsignacion > 1; 
+                        asigFueraTiempo = diasAsignacion > 1;
                     }
 
                     let diasAtencion = null, atencionFueraTiempo = false;
                     const esCerrado = ['Cerrado', 'Atendido', 'Resuelto'].includes(estadoTicket);
 
                     if (ticket.fecha_asignacion && esCerrado) {
-                        const fechaCierre = ticket.fecha_atencion || ticket.fecha_actualizacion || new Date().toISOString(); 
+                        const fechaCierre = ticket.fecha_atencion || ticket.fecha_actualizacion || new Date().toISOString();
                         diasAtencion = calcularDiasLaborables(ticket.fecha_asignacion, fechaCierre, feriadosList);
                         if (ticket.fecha_maxima_atencion) {
                             const limiteCalculado = calcularDiasLaborables(ticket.fecha_asignacion, ticket.fecha_maxima_atencion, feriadosList);
@@ -110,6 +139,7 @@ export default function Reportes() {
                 });
 
                 setTodosLosTickets(datosCorregidos);
+                setSemanasDisponibles(generarSemanasDisponibles(datosCorregidos));
             } catch (error) {
                 console.error("Error cargando reportes:", error.message);
             } finally {
@@ -138,10 +168,20 @@ export default function Reportes() {
                 const end = filtroFin ? new Date(filtroFin + 'T23:59:59').getTime() : Infinity;
                 return date >= start && date <= end;
             });
+        } else if (filtroTipo === 'semana' && filtroSemana) {
+            const [inicioTime, finTime] = filtroSemana.split('|');
+            const inicio = parseInt(inicioTime);
+            const fin = parseInt(finTime);
+
+            filtrados = filtrados.filter(t => {
+                if (!t.fecha_creacion_sd) return false;
+                const tiempoTicket = new Date(t.fecha_creacion_sd).getTime();
+                return tiempoTicket >= inicio && tiempoTicket <= fin;
+            });
         }
         setReportes(filtrados);
         calcularResumen(filtrados);
-    }, [filtroTipo, filtroMes, filtroInicio, filtroFin, todosLosTickets]);
+    }, [filtroTipo, filtroMes, filtroSemana, filtroInicio, filtroFin, todosLosTickets]);
 
     const calcularResumen = (datos) => {
         const total = datos.length;
@@ -177,8 +217,8 @@ export default function Reportes() {
             ["RESUMEN DEL PERIODO"],
             ["Total Creados", "Abiertos", "Resueltos", "Prom. Asignación (días)", "Prom. Resolución (días)", "Fuera de SLA"],
             [
-                resumen.totalTickets, resumen.abiertos, resumen.atendidos, 
-                resumen.promedioDiasAsignacion.toFixed(2), resumen.promedioDiasAtencion.toFixed(2), 
+                resumen.totalTickets, resumen.abiertos, resumen.atendidos,
+                resumen.promedioDiasAsignacion.toFixed(2), resumen.promedioDiasAtencion.toFixed(2),
                 resumen.fueraSlaAsignacion + resumen.fueraSlaAtencion
             ],
             [], // Fila vacía
@@ -205,7 +245,7 @@ export default function Reportes() {
         const hoja = XLSX.utils.aoa_to_sheet(datosExcel);
         const libro = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(libro, hoja, "Reporte SLA");
-        
+
         const fechaHoy = new Date().toISOString().slice(0, 10);
         XLSX.writeFile(libro, `Reporte_SLA_${fechaHoy}.xlsx`);
     };
@@ -213,7 +253,7 @@ export default function Reportes() {
     const descargarPDF = () => {
         if (!reportes.length) return alert("No hay datos para exportar.");
 
-        const doc = new jsPDF('landscape'); 
+        const doc = new jsPDF('landscape');
         const fechaHoy = new Date().toISOString().slice(0, 10);
 
         // Título principal
@@ -227,19 +267,19 @@ export default function Reportes() {
             startY: 35,
             head: [["Total Creados", "Abiertos", "Resueltos", "Prom. Asignación (días)", "Prom. Resolución (días)", "Fuera de SLA"]],
             body: [[
-                resumen.totalTickets, 
-                resumen.abiertos, 
-                resumen.atendidos, 
-                `${resumen.promedioDiasAsignacion.toFixed(2)} d`, 
-                `${resumen.promedioDiasAtencion.toFixed(2)} d`, 
+                resumen.totalTickets,
+                resumen.abiertos,
+                resumen.atendidos,
+                `${resumen.promedioDiasAsignacion.toFixed(2)} d`,
+                `${resumen.promedioDiasAtencion.toFixed(2)} d`,
                 resumen.fueraSlaAsignacion + resumen.fueraSlaAtencion
             ]],
             theme: 'grid',
-            headStyles: { fillColor: [59, 130, 246] } 
+            headStyles: { fillColor: [59, 130, 246] }
         });
 
         autoTable(doc, {
-            startY: doc.lastAutoTable.finalY + 15, 
+            startY: doc.lastAutoTable.finalY + 15,
             head: [["Ticket", "Prioridad", "Responsable", "Fecha Creación", "T. Asignación", "SLA Máximo", "T. Resolución", "Retraso", "Estado"]],
             body: reportes.map(rep => [
                 rep.codigo_ticket,
@@ -253,8 +293,8 @@ export default function Reportes() {
                 rep.estado || 'Abierto'
             ]),
             theme: 'striped',
-            headStyles: { fillColor: [51, 65, 85] }, 
-            styles: { fontSize: 8 } 
+            headStyles: { fillColor: [51, 65, 85] },
+            styles: { fontSize: 8 }
         });
 
         doc.save(`Reporte_SLA_${fechaHoy}.pdf`);
@@ -302,9 +342,9 @@ export default function Reportes() {
                     <span className="material-symbols-outlined" style={{ color: '#64748b' }}>filter_alt</span>
                     <span style={{ fontWeight: '600', color: '#334155' }}>Periodo:</span>
                 </div>
-                
-                <select 
-                    value={filtroTipo} 
+
+                <select
+                    value={filtroTipo}
                     onChange={(e) => {
                         setFiltroTipo(e.target.value);
                         setFiltroMes(''); setFiltroInicio(''); setFiltroFin('');
@@ -314,6 +354,7 @@ export default function Reportes() {
                     <option value="todos">Todo el Histórico</option>
                     <option value="mes">Mes en Específico</option>
                     <option value="rango">Rango de Fechas</option>
+                    <option value="semana">Por rango de semanas</option>
                 </select>
 
                 {filtroTipo === 'mes' && (
@@ -327,11 +368,26 @@ export default function Reportes() {
                         <input type="date" value={filtroFin} onChange={(e) => setFiltroFin(e.target.value)} style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', outline: 'none' }} />
                     </div>
                 )}
+                {filtroTipo === 'semana' && (
+                    <div className="filter-group">
+                        <label>Seleccionar Semana</label>
+                        <select
+                            className="form-control"
+                            value={filtroSemana}
+                            onChange={(e) => setFiltroSemana(e.target.value)}
+                        >
+                            <option value="">-- Seleccionar Semana --</option>
+                            {semanasDisponibles.map(sem => (
+                                <option key={sem.value} value={sem.value}>{sem.label}</option>
+                            ))}
+                        </select>
+                    </div>
+                )}
             </div>
 
             <h2 className="section-title" style={{ marginBottom: '16px' }}>
-                {filtroTipo === 'todos' ? 'Resumen Histórico General' : 
-                 filtroTipo === 'mes' ? 'Resumen del Mes' : 'Resumen por Rango de Fechas'}
+                {filtroTipo === 'todos' ? 'Resumen Histórico General' :
+                    filtroTipo === 'mes' ? 'Resumen del Mes' : 'Resumen por Rango de Fechas'}
             </h2>
 
             <div className="kpi-grid">
@@ -349,11 +405,11 @@ export default function Reportes() {
                 </div>
                 <div className="kpi-card">
                     <div className={`kpi-icon ${resumen.promedioDiasAsignacion > 1 ? 'icon-red' : 'icon-blue'}`}><span className="material-symbols-outlined">person_add</span></div>
-                    <div className="kpi-info"><h3 style={{ color: resumen.promedioDiasAsignacion > 1 ? '#dc2626' : 'inherit' }}>{resumen.promedioDiasAsignacion.toFixed(1)} <span style={{fontSize:'12px'}}>días</span></h3><p>Promedio Asignación</p></div>
+                    <div className="kpi-info"><h3 style={{ color: resumen.promedioDiasAsignacion > 1 ? '#dc2626' : 'inherit' }}>{resumen.promedioDiasAsignacion.toFixed(1)} <span style={{ fontSize: '12px' }}>días</span></h3><p>Promedio Asignación</p></div>
                 </div>
                 <div className="kpi-card">
                     <div className="kpi-icon icon-blue"><span className="material-symbols-outlined">timer</span></div>
-                    <div className="kpi-info"><h3>{resumen.promedioDiasAtencion.toFixed(1)} <span style={{fontSize:'12px'}}>días</span></h3><p>Promedio Resolución</p></div>
+                    <div className="kpi-info"><h3>{resumen.promedioDiasAtencion.toFixed(1)} <span style={{ fontSize: '12px' }}>días</span></h3><p>Promedio Resolución</p></div>
                 </div>
                 <div className="kpi-card">
                     <div className={`kpi-icon ${(resumen.fueraSlaAsignacion > 0 || resumen.fueraSlaAtencion > 0) ? 'icon-red' : 'icon-green'}`}><span className="material-symbols-outlined">assignment_late</span></div>
@@ -370,7 +426,6 @@ export default function Reportes() {
                         <thead>
                             <tr>
                                 <th>Ticket</th>
-                                <th>Prioridad</th>
                                 {esAdmin && <th>Responsable</th>}
                                 <th>Creación SD</th>
                                 <th className="text-center">T. Asignación</th>
@@ -387,7 +442,6 @@ export default function Reportes() {
                                 reportes.map((rep) => (
                                     <tr key={rep.id || rep.ticket_id}>
                                         <td className="t-id font-bold">{rep.codigo_ticket}</td>
-                                        <td><span className={`kpi-badge ${rep.prioridad === 'Alta' || rep.prioridad === 'Critica' ? 'badge-red' : 'badge-orange'}`} style={{ backgroundColor: 'transparent', border: '1px solid currentColor' }}>{rep.prioridad || '-'}</span></td>
                                         {esAdmin && <td className="t-assigned">{rep.responsable || 'Sin asignar'}</td>}
                                         <td className="t-date">{formatearFecha(rep.fecha_creacion_sd)}</td>
                                         <td className="text-center font-bold">
@@ -398,7 +452,7 @@ export default function Reportes() {
                                             {rep.dias_atencion_real === null ? <span style={{ color: '#94a3b8' }}>En proceso</span> : <span style={{ color: rep.atencion_fuera_tiempo ? '#dc2626' : '#16a34a' }}>{rep.dias_atencion_real.toFixed(1)} d</span>}
                                         </td>
                                         <td className="text-center font-bold">
-                                             {rep.dias_retraso_actual > 0 ? <span style={{ backgroundColor: '#fee2e2', color: '#dc2626', padding: '4px 8px', borderRadius: '12px', fontSize: '0.75rem' }}>+{rep.dias_retraso_actual.toFixed(1)} d</span> : <span style={{ color: '#94a3b8' }}>-</span>}
+                                            {rep.dias_retraso_actual > 0 ? <span style={{ backgroundColor: '#fee2e2', color: '#dc2626', padding: '4px 8px', borderRadius: '12px', fontSize: '0.75rem' }}>+{rep.dias_retraso_actual.toFixed(1)} d</span> : <span style={{ color: '#94a3b8' }}>-</span>}
                                         </td>
                                         <td>
                                             <span className={`status-pill ${['Cerrado', 'Atendido', 'Resuelto'].includes(rep.estado) ? 'status-resolved' : 'status-open'}`}>{rep.estado || 'Abierto'}</span>
